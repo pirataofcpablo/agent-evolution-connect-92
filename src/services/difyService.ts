@@ -25,39 +25,53 @@ export const getDifyConfig = (instanceName: string): DifyConfig | null => {
   }
 };
 
-// Nova função para testar a conexão com o Dify
+// Improved test connection function with better error handling
 export const testDifyConnection = async (config: DifyConfig): Promise<boolean> => {
   try {
+    // Fix: Use the correct endpoint based on model type
     const endpoint = config.modelType === 'chat' 
       ? `/chat-messages` 
       : `/completion-messages`;
     
-    console.log(`Testando conexão Dify com endpoint: ${config.apiUrl}${endpoint}`);
+    // Make sure the URL ends with "/v1" if not already present
+    const baseUrl = config.apiUrl.endsWith('/v1') ? config.apiUrl : `${config.apiUrl}/v1`;
+    const finalUrl = `${baseUrl}${endpoint}`;
     
-    const response = await fetch(`${config.apiUrl}${endpoint}`, {
+    console.log(`Testando conexão Dify com URL: ${finalUrl}`);
+    
+    const response = await fetch(finalUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${config.apiKey}`
+        'Authorization': `Bearer ${config.apiKey}`,
+        'Accept': 'application/json'
       },
       body: JSON.stringify({
         inputs: {},
         query: "Teste de conexão",
         response_mode: "blocking",
         conversation_id: '',
-        user: 'whatsapp-integration-test',
-        files: []
+        user: 'whatsapp-integration-test'
       })
     });
 
     console.log("Resposta do teste Dify:", response.status);
-    return response.ok;
+    
+    // Check if the response is successful
+    if (!response.ok) {
+      const errorData = await response.text();
+      console.error("Erro na resposta Dify:", errorData);
+      return false;
+    }
+    
+    return true;
   } catch (error) {
     console.error('Erro ao testar conexão com Dify:', error);
     return false;
   }
 };
 
+// Improved send message function with better error handling
 export const sendMessageToDify = async (
   message: string, 
   config: DifyConfig
@@ -67,27 +81,32 @@ export const sendMessageToDify = async (
       ? `/chat-messages` 
       : `/completion-messages`;
     
-    console.log(`Enviando mensagem para Dify: ${message}`);
-    console.log(`URL: ${config.apiUrl}${endpoint}`);
+    // Make sure the URL ends with "/v1" if not already present
+    const baseUrl = config.apiUrl.endsWith('/v1') ? config.apiUrl : `${config.apiUrl}/v1`;
+    const finalUrl = `${baseUrl}${endpoint}`;
     
-    const response = await fetch(`${config.apiUrl}${endpoint}`, {
+    console.log(`Enviando mensagem para Dify: ${message}`);
+    console.log(`URL: ${finalUrl}`);
+    
+    const response = await fetch(finalUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${config.apiKey}`
+        'Authorization': `Bearer ${config.apiKey}`,
+        'Accept': 'application/json'
       },
       body: JSON.stringify({
         inputs: {},
         query: message,
         response_mode: 'blocking',
         conversation_id: '',
-        user: 'whatsapp-user',
-        files: []
+        user: 'whatsapp-user'
       })
     });
 
     if (!response.ok) {
-      console.error(`Erro na API Dify: ${response.status} ${response.statusText}`);
+      const errorData = await response.text();
+      console.error(`Erro na API Dify (${response.status}):`, errorData);
       throw new Error(`Erro na API Dify: ${response.statusText}`);
     }
 
@@ -100,7 +119,7 @@ export const sendMessageToDify = async (
   }
 };
 
-// Função para registrar o bot Dify na Evolution API
+// Improved webhook registration function
 export const registerDifyBot = async (
   instanceName: string, 
   config: DifyConfig
@@ -111,9 +130,9 @@ export const registerDifyBot = async (
   try {
     console.log(`Registrando webhook do Dify para a instância ${instanceName}`);
     
-    // URL para onde a Evolution API enviará as mensagens
-    // Usamos a URL atual do navegador como base para o webhook
-    const baseUrl = window.location.origin;
+    // URL for Evolution API to send messages to
+    // Use window.location.origin as base URL in the browser environment
+    const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
     const webhookUrl = `${baseUrl}/api/dify/webhook/${instanceName}`;
     
     console.log(`URL do webhook: ${webhookUrl}`);
@@ -136,8 +155,8 @@ export const registerDifyBot = async (
     const response = await fetch(`${EVO_API_URL}/instance/webhook`, options);
     
     if (!response.ok) {
-      const responseData = await response.json().catch(() => ({}));
-      console.error("Erro ao registrar webhook:", responseData);
+      const responseData = await response.text();
+      console.error(`Erro ao registrar webhook (${response.status}):`, responseData);
       return false;
     }
     

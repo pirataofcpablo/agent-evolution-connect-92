@@ -4,7 +4,7 @@ import { getN8nConfig } from './n8nService';
 import { sendMessageToDify } from './difyService';
 import { sendMessageToN8n } from './n8nService';
 
-// Endpoints da Evolution API para receber e enviar mensagens
+// Endpoints for Evolution API
 const EVO_API_KEY = "29MoyRfK6RM0CWCOXnReOpAj6dIYTt3z";
 const EVO_API_URL = "https://v2.solucoesweb.uk";
 
@@ -14,7 +14,7 @@ export interface WhatsAppMessage {
   message: string;
 }
 
-// Registrar um webhook para receber mensagens do WhatsApp
+// Register webhook to receive WhatsApp messages
 export const registerWebhook = async (instanceName: string, webhookUrl: string): Promise<boolean> => {
   try {
     if (!instanceName || !webhookUrl) {
@@ -42,11 +42,13 @@ export const registerWebhook = async (instanceName: string, webhookUrl: string):
     const response = await fetch(`${EVO_API_URL}/instance/webhook`, options);
     
     if (!response.ok) {
-      const responseData = await response.json().catch(() => ({}));
-      console.error(`Falha ao registrar webhook para ${instanceName}:`, responseData);
+      // Use text() instead of json() for better error handling
+      const responseText = await response.text();
+      console.error(`Falha ao registrar webhook para ${instanceName} (${response.status}):`, responseText);
       return false;
     }
     
+    // Only parse as JSON if the response is OK
     const responseData = await response.json();
     console.log(`Webhook registrado com sucesso para ${instanceName}:`, responseData);
     return true;
@@ -56,7 +58,7 @@ export const registerWebhook = async (instanceName: string, webhookUrl: string):
   }
 };
 
-// Enviar mensagem para o WhatsApp usando a Evolution API
+// Send message to WhatsApp using Evolution API
 export const sendWhatsAppMessage = async (
   instanceName: string, 
   recipient: string, 
@@ -93,8 +95,8 @@ export const sendWhatsAppMessage = async (
     const response = await fetch(`${EVO_API_URL}/message/sendText/${instanceName}`, options);
     
     if (!response.ok) {
-      const responseData = await response.json().catch(() => ({}));
-      console.error("Erro ao enviar mensagem:", responseData);
+      const responseText = await response.text();
+      console.error(`Erro ao enviar mensagem (${response.status}):`, responseText);
       return false;
     }
     
@@ -107,7 +109,7 @@ export const sendWhatsAppMessage = async (
   }
 };
 
-// Processar mensagem recebida e rotear para o bot apropriado
+// Process incoming message and route to appropriate bot
 export const processIncomingMessage = async (message: WhatsAppMessage): Promise<void> => {
   try {
     const { instanceName, sender, message: text } = message;
@@ -119,19 +121,19 @@ export const processIncomingMessage = async (message: WhatsAppMessage): Promise<
     
     console.log(`Processando mensagem recebida de ${sender} na instância ${instanceName}: "${text}"`);
     
-    // Extrair o nome base da instância
+    // Extract base instance name
     const baseInstanceName = instanceName.replace("_Cliente", "");
     
-    // Verificar se há integração com Dify configurada
+    // Check if Dify integration is configured
     const difyConfig = getDifyConfig(baseInstanceName);
     if (difyConfig) {
       try {
         console.log("Integração Dify encontrada. Processando mensagem...");
-        // Processar mensagem com Dify
+        // Process message with Dify with error handling
         const response = await sendMessageToDify(text, difyConfig);
         
         if (response) {
-          // Enviar resposta de volta para o WhatsApp
+          // Send response back to WhatsApp
           console.log(`Enviando resposta Dify para ${sender}: "${response}"`);
           const sent = await sendWhatsAppMessage(instanceName, sender, response);
           if (sent) {
@@ -141,29 +143,39 @@ export const processIncomingMessage = async (message: WhatsAppMessage): Promise<
           }
         } else {
           console.error("Resposta vazia do Dify");
+          // Send fallback message
+          await sendWhatsAppMessage(instanceName, sender, 
+            "Desculpe, estou com problemas para processar sua mensagem no momento. Tente novamente mais tarde.");
         }
         return;
       } catch (error) {
         console.error("Erro ao processar mensagem com Dify:", error);
+        // Try N8n as fallback
       }
     } else {
       console.log("Nenhuma integração Dify encontrada para", baseInstanceName);
     }
     
-    // Se falhou ou não tem Dify, tentar com n8n
+    // If Dify failed or isn't configured, try with N8n
     const n8nConfig = getN8nConfig(baseInstanceName);
     if (n8nConfig) {
       try {
         console.log("Integração n8n encontrada. Processando mensagem...");
-        // Enviar mensagem para o n8n (webhook ou API)
+        // Send message to n8n (webhook or API)
         const sent = await sendMessageToN8n(text, sender, n8nConfig);
         if (sent) {
           console.log(`Mensagem encaminhada para n8n: ${text}`);
         } else {
           console.error(`Falha ao encaminhar mensagem para n8n: ${text}`);
+          // Send fallback message
+          await sendWhatsAppMessage(instanceName, sender,
+            "Desculpe, estou com problemas para encaminhar sua mensagem no momento. Tente novamente mais tarde.");
         }
       } catch (error) {
         console.error("Erro ao processar mensagem com n8n:", error);
+        // Send fallback message
+        await sendWhatsAppMessage(instanceName, sender,
+          "Desculpe, estou com problemas para processar sua mensagem no momento. Tente novamente mais tarde.");
       }
     } else {
       console.log("Nenhuma integração n8n encontrada para", baseInstanceName);
@@ -173,7 +185,7 @@ export const processIncomingMessage = async (message: WhatsAppMessage): Promise<
   }
 };
 
-// Configuração para o backend receber mensagens da Evolution e processá-las
+// Configuration for backend to receive messages from Evolution
 export const setupWebhookReceiver = (backendUrl: string): void => {
   if (!backendUrl) {
     console.error("URL do backend não fornecida");
@@ -181,5 +193,5 @@ export const setupWebhookReceiver = (backendUrl: string): void => {
   }
   
   console.log(`Webhook receiver configurado em ${backendUrl}`);
-  // Esta função seria implementada no backend para receber webhooks da Evolution API
+  // This function would be implemented in the backend to receive webhooks from Evolution API
 };

@@ -18,7 +18,7 @@ const Index = () => {
   const [n8nConfigured, setN8nConfigured] = useState(false);
   const [activeTab, setActiveTab] = useState("conexao");
   
-  // Verifica se há uma instância conectada ao carregar a página
+  // Check if an instance is connected when loading the page
   useEffect(() => {
     try {
       const storedInstanceName = localStorage.getItem('instanceName');
@@ -27,12 +27,13 @@ const Index = () => {
       console.log("Verificando instância:", storedInstanceName, storedInstanceStatus);
       
       if (storedInstanceName && storedInstanceStatus && storedInstanceStatus !== "Desligada") {
+        // Extract base name without "_Cliente" suffix for display and configuration lookup
         const baseInstanceName = storedInstanceName.replace("_Cliente", "");
         setInstanceConnected(true);
         setInstanceName(baseInstanceName);
         console.log("Instância conectada:", baseInstanceName);
         
-        // Verificar se há configurações para Dify e n8n
+        // Check if there are Dify and n8n configurations
         try {
           const difyConfig = getDifyConfig(baseInstanceName);
           const n8nConfig = getN8nConfig(baseInstanceName);
@@ -43,12 +44,20 @@ const Index = () => {
           setDifyConfigured(!!difyConfig);
           setN8nConfigured(!!n8nConfig);
           
-          // Redirecionar para status se já estiver configurado
+          // Redirect to status if already configured
           if (difyConfig || n8nConfig) {
             setActiveTab("status");
+            
+            // Show services that are active
+            let activeServices = [];
+            if (difyConfig) activeServices.push("Dify IA");
+            if (n8nConfig) activeServices.push("n8n");
+            
+            const servicesMessage = activeServices.join(" e ");
+            
             toast({
               title: "Serviços Ativos",
-              description: `${difyConfig ? "Dify IA" : ""}${difyConfig && n8nConfig ? " e " : ""}${n8nConfig ? "n8n" : ""} configurados e ativos`,
+              description: `${servicesMessage} configurado${activeServices.length > 1 ? 's' : ''} e ativo${activeServices.length > 1 ? 's' : ''}`,
             });
           }
         } catch (error) {
@@ -62,7 +71,7 @@ const Index = () => {
     }
   }, []);
 
-  // Função segura para mudar de aba
+  // Safe function to change tabs
   const handleTabChange = (value: string) => {
     setActiveTab(value);
   };

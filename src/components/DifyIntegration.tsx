@@ -24,7 +24,7 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
   const [testingConnection, setTestingConnection] = useState(false);
   const [registrationError, setRegistrationError] = useState<string | null>(null);
   
-  // Carregar configuração se existir
+  // Load configuration if exists
   useEffect(() => {
     if (!instanceName) return;
     
@@ -67,6 +67,7 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
       };
       
       console.log("Testando conexão com Dify...");
+      console.log("Configuração:", config);
       const success = await testDifyConnection(config);
       
       if (success) {
@@ -76,14 +77,14 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
           description: "A conexão com o Dify foi estabelecida com sucesso.",
         });
       } else {
-        throw new Error("Não foi possível conectar ao Dify");
+        throw new Error("Não foi possível conectar ao Dify. Verifique a URL da API e suas credenciais.");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erro na conexão:", error);
       setConnectionSuccess(false);
       toast({
         title: "Erro na conexão",
-        description: "Não foi possível conectar ao Dify. Verifique suas credenciais.",
+        description: error.message || "Não foi possível conectar ao Dify. Verifique suas credenciais.",
         variant: "destructive",
       });
     } finally {
@@ -115,7 +116,7 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
       
       console.log("Iniciando integração com Dify para a instância:", fullInstanceName);
       
-      // Salvar a configuração
+      // Save configuration
       const config = {
         apiKey,
         apiUrl,
@@ -123,17 +124,17 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
         modelType
       };
       
-      // Testar conexão antes de prosseguir
+      // Test connection before proceeding
       console.log("Testando conexão com Dify...");
       const isConnected = await testDifyConnection(config);
       
       if (!isConnected) {
-        throw new Error("Não foi possível conectar ao Dify. Verifique suas credenciais.");
+        throw new Error("Não foi possível conectar ao Dify. Verifique suas credenciais e a URL da API.");
       }
       
       console.log("Conexão com Dify estabelecida com sucesso.");
       
-      // Registrar o webhook do Dify na Evolution
+      // Register Dify webhook on Evolution
       console.log("Registrando webhook na Evolution API...");
       const registered = await registerDifyBot(fullInstanceName, config);
       
@@ -143,7 +144,7 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
       
       console.log("Webhook registrado com sucesso.");
       
-      // Apenas salvar a configuração se tudo der certo
+      // Only save configuration if everything is successful
       saveDifyConfig(instanceName, config);
       
       setIntegrationComplete(true);
@@ -164,14 +165,12 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
     }
   };
 
-  // Função de cancelamento segura sem manipulação direta do DOM
   const handleCancel = () => {
     console.log("Cancelando operação");
     setApiKey("");
     setApiUrl("https://api.dify.ai/v1");
     setApplicationId("");
     setModelType("chat");
-    // Navegação será tratada pelo componente pai se necessário
   };
 
   return (
@@ -223,16 +222,16 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="apiUrl">API URL (Opcional)</Label>
+            <Label htmlFor="apiUrl">API URL</Label>
             <Input
               id="apiUrl"
-              placeholder="URL da API"
+              placeholder="URL da API (ex: https://api.dify.ai/v1)"
               value={apiUrl}
               onChange={(e) => setApiUrl(e.target.value)}
               className="bg-gray-800 border-gray-700 text-white"
             />
             <p className="text-xs text-gray-400">
-              Deixe o padrão se estiver usando o Dify Cloud
+              URL base da API do Dify (geralmente termina com /v1)
             </p>
           </div>
         </div>
