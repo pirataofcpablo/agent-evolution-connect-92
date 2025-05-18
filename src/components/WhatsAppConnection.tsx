@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { WhatsApp, QrCode, Link, Unlink, Trash2, Check } from "lucide-react";
+import { MessageSquare, QrCode, Link, Unlink, Trash2, Check } from "lucide-react";
 import { useEvoInstance } from '@/hooks/useEvoInstance';
 
 const WhatsAppConnection: React.FC = () => {
