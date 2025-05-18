@@ -27,10 +27,14 @@ const Index = () => {
       const baseInstanceName = storedInstanceName.replace("_Cliente", "");
       setInstanceConnected(true);
       setInstanceName(baseInstanceName);
+      console.log("Instância conectada:", baseInstanceName);
       
       // Verificar se há configurações para Dify e n8n
       const difyConfig = getDifyConfig(baseInstanceName);
       const n8nConfig = getN8nConfig(baseInstanceName);
+      
+      console.log("Configuração Dify:", difyConfig ? "Encontrada" : "Não encontrada");
+      console.log("Configuração n8n:", n8nConfig ? "Encontrada" : "Não encontrada");
       
       setDifyConfigured(!!difyConfig);
       setN8nConfigured(!!n8nConfig);

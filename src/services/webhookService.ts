@@ -17,6 +17,8 @@ export interface WhatsAppMessage {
 // Registrar um webhook para receber mensagens do WhatsApp
 export const registerWebhook = async (instanceName: string, webhookUrl: string): Promise<boolean> => {
   try {
+    console.log(`Registrando webhook para ${instanceName} em ${webhookUrl}`);
+    
     const options = {
       method: 'POST',
       headers: {
@@ -31,11 +33,12 @@ export const registerWebhook = async (instanceName: string, webhookUrl: string):
     };
 
     const response = await fetch(`${EVO_API_URL}/instance/webhook`, options);
+    const responseData = await response.json();
     
     if (response.ok) {
-      console.log(`Webhook registrado com sucesso para ${instanceName}`);
+      console.log(`Webhook registrado com sucesso para ${instanceName}:`, responseData);
     } else {
-      console.error(`Falha ao registrar webhook para ${instanceName}:`, await response.text());
+      console.error(`Falha ao registrar webhook para ${instanceName}:`, responseData);
     }
     
     return response.ok;
@@ -52,6 +55,8 @@ export const sendWhatsAppMessage = async (
   message: string
 ): Promise<boolean> => {
   try {
+    console.log(`Enviando mensagem para ${recipient} via ${instanceName}: "${message}"`);
+    
     const options = {
       method: 'POST',
       headers: {
@@ -70,13 +75,13 @@ export const sendWhatsAppMessage = async (
       })
     };
 
-    console.log(`Enviando mensagem para ${recipient} via ${instanceName}`);
     const response = await fetch(`${EVO_API_URL}/message/sendText/${instanceName}`, options);
+    const responseData = await response.json();
     
     if (response.ok) {
-      console.log("Mensagem enviada com sucesso");
+      console.log("Mensagem enviada com sucesso:", responseData);
     } else {
-      console.error("Erro ao enviar mensagem:", await response.text());
+      console.error("Erro ao enviar mensagem:", responseData);
     }
     
     return response.ok;
@@ -102,8 +107,12 @@ export const processIncomingMessage = async (message: WhatsAppMessage): Promise<
       const response = await sendMessageToDify(text, difyConfig);
       
       // Enviar resposta de volta para o WhatsApp
-      await sendWhatsAppMessage(instanceName, sender, response);
-      console.log(`Resposta Dify enviada para ${sender}: "${response}"`);
+      const sent = await sendWhatsAppMessage(instanceName, sender, response);
+      if (sent) {
+        console.log(`Resposta Dify enviada para ${sender}: "${response}"`);
+      } else {
+        console.error(`Falha ao enviar resposta Dify para ${sender}`);
+      }
       return;
     } catch (error) {
       console.error("Erro ao processar mensagem com Dify:", error);
@@ -118,8 +127,12 @@ export const processIncomingMessage = async (message: WhatsAppMessage): Promise<
     try {
       console.log("Integração n8n encontrada. Processando mensagem...");
       // Enviar mensagem para o n8n (webhook ou API)
-      await sendMessageToN8n(text, sender, n8nConfig);
-      console.log(`Mensagem encaminhada para n8n: ${text}`);
+      const sent = await sendMessageToN8n(text, sender, n8nConfig);
+      if (sent) {
+        console.log(`Mensagem encaminhada para n8n: ${text}`);
+      } else {
+        console.error(`Falha ao encaminhar mensagem para n8n: ${text}`);
+      }
     } catch (error) {
       console.error("Erro ao processar mensagem com n8n:", error);
     }
@@ -132,5 +145,4 @@ export const processIncomingMessage = async (message: WhatsAppMessage): Promise<
 export const setupWebhookReceiver = (backendUrl: string): void => {
   console.log(`Webhook receiver configurado em ${backendUrl}`);
   // Esta função seria implementada no backend para receber webhooks da Evolution API
-  // No contexto atual, estamos simulando essa funcionalidade
 };

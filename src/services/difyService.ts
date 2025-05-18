@@ -38,6 +38,7 @@ export const testDifyConnection = async (config: DifyConfig): Promise<boolean> =
       })
     });
 
+    console.log("Resposta do teste Dify:", response.status);
     return response.ok;
   } catch (error) {
     console.error('Erro ao testar conexão com Dify:', error);
@@ -53,6 +54,9 @@ export const sendMessageToDify = async (
     const endpoint = config.modelType === 'chat' 
       ? `/chat-messages` 
       : `/completion-messages`;
+    
+    console.log(`Enviando mensagem para Dify: ${message}`);
+    console.log(`URL: ${config.apiUrl}${endpoint}`);
     
     const response = await fetch(`${config.apiUrl}${endpoint}`, {
       method: 'POST',
@@ -71,10 +75,12 @@ export const sendMessageToDify = async (
     });
 
     if (!response.ok) {
+      console.error(`Erro na API Dify: ${response.status} ${response.statusText}`);
       throw new Error(`Erro na API Dify: ${response.statusText}`);
     }
 
     const data = await response.json();
+    console.log("Resposta do Dify:", data);
     return data.answer || "Não consegui processar sua mensagem.";
   } catch (error) {
     console.error('Erro ao enviar mensagem para o Dify:', error);
@@ -82,19 +88,23 @@ export const sendMessageToDify = async (
   }
 };
 
-// Nova função para registrar o bot Dify na Evolution API
+// Função para registrar o bot Dify na Evolution API
 export const registerDifyBot = async (
   instanceName: string, 
   config: DifyConfig
 ): Promise<boolean> => {
-  // Aqui estamos registrando o webhook na Evolution API
-  // Este webhook será notificado quando uma nova mensagem chegar
   const EVO_API_KEY = "29MoyRfK6RM0CWCOXnReOpAj6dIYTt3z";
   const EVO_API_URL = "https://v2.solucoesweb.uk";
   
   try {
-    // Registrar webhook para a instância
-    const webhookUrl = `https://crispy-space-acorn-xj5654vq6rh99g9-3000.app.github.dev/api/dify/webhook/${instanceName}`;
+    console.log(`Registrando webhook do Dify para a instância ${instanceName}`);
+    
+    // URL para onde a Evolution API enviará as mensagens
+    // Usamos a URL atual do navegador como base para o webhook
+    const baseUrl = window.location.origin;
+    const webhookUrl = `${baseUrl}/api/dify/webhook/${instanceName}`;
+    
+    console.log(`URL do webhook: ${webhookUrl}`);
     
     const options = {
       method: 'POST',
@@ -103,14 +113,23 @@ export const registerDifyBot = async (
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        "instanceName": instanceName,
-        "webhookUrl": webhookUrl,
-        "events": ["messages.upsert"]
+        instanceName: instanceName,
+        webhookUrl: webhookUrl,
+        events: ["messages.upsert"]
       })
     };
 
     const response = await fetch(`${EVO_API_URL}/instance/webhook`, options);
-    return response.ok;
+    const responseData = await response.json();
+    console.log("Resposta do registro do webhook:", responseData);
+    
+    if (response.ok) {
+      console.log("Webhook registrado com sucesso!");
+      return true;
+    } else {
+      console.error("Erro ao registrar webhook:", responseData);
+      return false;
+    }
   } catch (error) {
     console.error("Erro ao registrar webhook do Dify:", error);
     return false;

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { saveDifyConfig, getDifyConfig, testDifyConnection, registerDifyBot } from '@/services/difyService';
-import { Loader2, Bot, CheckCircle } from "lucide-react";
+import { Loader2, Bot, CheckCircle, AlertCircle } from "lucide-react";
 
 interface DifyIntegrationProps {
   instanceName: string;
@@ -21,6 +21,8 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [connectionSuccess, setConnectionSuccess] = useState(false);
   const [integrationComplete, setIntegrationComplete] = useState(false);
+  const [testingConnection, setTestingConnection] = useState(false);
+  const [registrationError, setRegistrationError] = useState<string | null>(null);
   
   // Carregar configuração se existir
   useEffect(() => {
@@ -31,6 +33,7 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
       setApplicationId(savedConfig.applicationId);
       setModelType(savedConfig.modelType);
       setIntegrationComplete(true);
+      setConnectionSuccess(true);
     }
   }, [instanceName]);
 
@@ -44,7 +47,7 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
       return;
     }
 
-    setIsLoading(true);
+    setTestingConnection(true);
     
     try {
       const config = {
@@ -54,6 +57,7 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
         modelType
       };
       
+      console.log("Testando conexão com Dify...");
       const success = await testDifyConnection(config);
       
       if (success) {
@@ -74,7 +78,7 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
         variant: "destructive",
       });
     } finally {
-      setIsLoading(false);
+      setTestingConnection(false);
     }
   };
 
@@ -91,9 +95,12 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
     }
 
     setIsLoading(true);
+    setRegistrationError(null);
     
     try {
       const fullInstanceName = `${instanceName}_Cliente`;
+      
+      console.log("Iniciando integração com Dify para a instância:", fullInstanceName);
       
       // Salvar a configuração
       const config = {
@@ -103,32 +110,40 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
         modelType
       };
       
-      saveDifyConfig(instanceName, config);
-      
-      // Testar conexão e registrar o bot
+      // Testar conexão antes de prosseguir
+      console.log("Testando conexão com Dify...");
       const isConnected = await testDifyConnection(config);
       
       if (!isConnected) {
-        throw new Error("Não foi possível conectar ao Dify");
+        throw new Error("Não foi possível conectar ao Dify. Verifique suas credenciais.");
       }
       
+      console.log("Conexão com Dify estabelecida com sucesso.");
+      
       // Registrar o webhook do Dify na Evolution
+      console.log("Registrando webhook na Evolution API...");
       const registered = await registerDifyBot(fullInstanceName, config);
       
       if (!registered) {
         throw new Error("Não foi possível registrar o bot na instância WhatsApp");
       }
       
+      console.log("Webhook registrado com sucesso.");
+      
+      // Apenas salvar a configuração se tudo der certo
+      saveDifyConfig(instanceName, config);
+      
       setIntegrationComplete(true);
       toast({
         title: "Integração realizada",
         description: "O bot Dify foi integrado com sucesso à instância " + instanceName,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erro ao realizar integração:", error);
+      setRegistrationError(error.message);
       toast({
         title: "Erro",
-        description: "Houve um erro ao realizar a integração do Dify.",
+        description: error.message || "Houve um erro ao realizar a integração do Dify.",
         variant: "destructive",
       });
     } finally {
@@ -153,6 +168,16 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
           <AlertTitle className="text-green-400">Integração Completa</AlertTitle>
           <AlertDescription className="text-gray-300">
             O bot Dify está configurado para responder automaticamente às mensagens do WhatsApp.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {registrationError && (
+        <Alert className="bg-red-900/20 border-red-500/30">
+          <AlertCircle className="h-5 w-5 text-red-400" />
+          <AlertTitle className="text-red-400">Erro na Integração</AlertTitle>
+          <AlertDescription className="text-gray-300">
+            {registrationError}
           </AlertDescription>
         </Alert>
       )}
@@ -232,11 +257,11 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
           <Button 
             type="button"
             onClick={handleTestConnection}
-            disabled={isLoading || !apiKey || !applicationId}
+            disabled={testingConnection || !apiKey || !applicationId}
             variant="outline"
             className="border-blue-600 hover:bg-blue-900/20 text-blue-400"
           >
-            {isLoading ? (
+            {testingConnection ? (
               <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Testando...</>
             ) : (
               <>Testar Conexão</>
