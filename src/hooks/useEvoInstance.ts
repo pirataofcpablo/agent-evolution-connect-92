@@ -9,6 +9,7 @@ import {
   deleteInstance,
   EvoInstance
 } from '@/services/evoService';
+import { registerWebhook } from '@/services/webhookService';
 
 interface UseEvoInstanceReturn {
   loading: boolean;
@@ -64,6 +65,11 @@ export const useEvoInstance = (): UseEvoInstanceReturn => {
         
         // Criar workspace
         await createWorkspace(fullInstanceName);
+        
+        // Configurar webhook para receber mensagens
+        // Este é um URL exemplo - em produção, seria o URL do seu backend
+        const webhookUrl = `https://crispy-space-acorn-xj5654vq6rh99g9-3000.app.github.dev/api/whatsapp/webhook`;
+        await registerWebhook(fullInstanceName, webhookUrl);
         
         toast({
           title: "Sucesso",

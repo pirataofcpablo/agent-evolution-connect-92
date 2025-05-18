@@ -1,10 +1,11 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { toast } from "@/components/ui/use-toast";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { saveDifyConfig, getDifyConfig } from '@/services/difyService';
 
 interface DifyIntegrationProps {
   instanceName: string;
@@ -16,6 +17,17 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
   const [applicationId, setApplicationId] = useState("");
   const [modelType, setModelType] = useState("text-generation");
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Carregar configuração se existir
+  useEffect(() => {
+    const savedConfig = getDifyConfig(instanceName);
+    if (savedConfig) {
+      setApiKey(savedConfig.apiKey);
+      setApiUrl(savedConfig.apiUrl);
+      setApplicationId(savedConfig.applicationId);
+      setModelType(savedConfig.modelType);
+    }
+  }, [instanceName]);
 
   const handleSaveIntegration = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,20 +43,29 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
 
     setIsLoading(true);
     
-    // Simulando uma chamada de API
-    setTimeout(() => {
-      console.log("Integrando Dify com a instância:", instanceName);
-      console.log("API Key:", apiKey);
-      console.log("Application ID:", applicationId);
-      console.log("Model Type:", modelType);
+    try {
+      // Salvar a configuração
+      saveDifyConfig(instanceName, {
+        apiKey,
+        apiUrl,
+        applicationId,
+        modelType
+      });
       
       toast({
         title: "Integração realizada",
         description: "O bot Dify foi integrado com sucesso à instância " + instanceName,
       });
-      
+    } catch (error) {
+      console.error("Erro ao salvar configuração:", error);
+      toast({
+        title: "Erro",
+        description: "Houve um erro ao salvar a configuração do Dify.",
+        variant: "destructive",
+      });
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   };
 
   return (

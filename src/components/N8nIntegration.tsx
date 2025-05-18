@@ -1,10 +1,11 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { toast } from "@/components/ui/use-toast";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import { saveN8nConfig, getN8nConfig } from '@/services/n8nService';
 
 interface N8nIntegrationProps {
   instanceName: string;
@@ -17,6 +18,18 @@ const N8nIntegration: React.FC<N8nIntegrationProps> = ({ instanceName }) => {
   const [enableWebhook, setEnableWebhook] = useState(true);
   const [enableApi, setEnableApi] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Carregar configuração se existir
+  useEffect(() => {
+    const savedConfig = getN8nConfig(instanceName);
+    if (savedConfig) {
+      setWebhookUrl(savedConfig.webhookUrl || "");
+      setApiKey(savedConfig.apiKey || "");
+      setN8nUrl(savedConfig.n8nUrl || "");
+      setEnableWebhook(savedConfig.enableWebhook);
+      setEnableApi(savedConfig.enableApi);
+    }
+  }, [instanceName]);
 
   const handleSaveIntegration = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,20 +54,30 @@ const N8nIntegration: React.FC<N8nIntegrationProps> = ({ instanceName }) => {
 
     setIsLoading(true);
     
-    // Simulando uma chamada de API
-    setTimeout(() => {
-      console.log("Integrando n8n com a instância:", instanceName);
-      console.log("Webhook URL:", webhookUrl);
-      console.log("API Key:", apiKey);
-      console.log("n8n URL:", n8nUrl);
+    try {
+      // Salvar a configuração
+      saveN8nConfig(instanceName, {
+        webhookUrl,
+        apiKey,
+        n8nUrl,
+        enableWebhook,
+        enableApi
+      });
       
       toast({
         title: "Integração realizada",
         description: "O n8n foi integrado com sucesso à instância " + instanceName,
       });
-      
+    } catch (error) {
+      console.error("Erro ao salvar configuração:", error);
+      toast({
+        title: "Erro",
+        description: "Houve um erro ao salvar a configuração do n8n.",
+        variant: "destructive",
+      });
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   };
 
   return (
