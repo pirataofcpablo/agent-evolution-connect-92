@@ -8,10 +8,15 @@ import BotIntegration from "@/components/BotIntegration";
 import WhatsAppConnection from "@/components/WhatsAppConnection";
 import BotStatus from "@/components/BotStatus";
 import { toast } from "@/components/ui/use-toast";
+import { getDifyConfig } from '@/services/difyService';
+import { getN8nConfig } from '@/services/n8nService';
 
 const Index = () => {
   const [instanceConnected, setInstanceConnected] = useState(false);
   const [instanceName, setInstanceName] = useState("");
+  const [difyConfigured, setDifyConfigured] = useState(false);
+  const [n8nConfigured, setN8nConfigured] = useState(false);
+  const [activeTab, setActiveTab] = useState("conexao");
   
   // Verifica se há uma instância conectada ao carregar a página
   useEffect(() => {
@@ -19,8 +24,25 @@ const Index = () => {
     const storedInstanceStatus = localStorage.getItem('instanceStatus');
     
     if (storedInstanceName && storedInstanceStatus && storedInstanceStatus !== "Desligada") {
+      const baseInstanceName = storedInstanceName.replace("_Cliente", "");
       setInstanceConnected(true);
-      setInstanceName(storedInstanceName.replace("_Cliente", ""));
+      setInstanceName(baseInstanceName);
+      
+      // Verificar se há configurações para Dify e n8n
+      const difyConfig = getDifyConfig(baseInstanceName);
+      const n8nConfig = getN8nConfig(baseInstanceName);
+      
+      setDifyConfigured(!!difyConfig);
+      setN8nConfigured(!!n8nConfig);
+      
+      // Redirecionar para status se já estiver configurado
+      if (difyConfig || n8nConfig) {
+        setActiveTab("status");
+        toast({
+          title: "Serviços Ativos",
+          description: `${difyConfig ? "Dify IA" : ""}${difyConfig && n8nConfig ? " e " : ""}${n8nConfig ? "n8n" : ""} configurados e ativos`,
+        });
+      }
     }
   }, []);
 
@@ -34,7 +56,7 @@ const Index = () => {
         <div className="flex-1 p-6 mx-auto max-w-7xl">
           <h1 className="text-3xl font-bold mb-6">Sistema SAAS de Agentes IA</h1>
           
-          <Tabs defaultValue="conexao" className="w-full">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid grid-cols-3 mb-8">
               <TabsTrigger value="conexao">📲 Conectar</TabsTrigger>
               <TabsTrigger value="bots">🤖 Integrar Bots</TabsTrigger>

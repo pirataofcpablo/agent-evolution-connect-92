@@ -20,11 +20,16 @@ const BotStatus: React.FC<BotStatusProps> = ({ instanceName }) => {
   const [testMessage, setTestMessage] = useState("");
   const [recipient, setRecipient] = useState("");
   const [isSending, setIsSending] = useState(false);
+  const [lastSentMessage, setLastSentMessage] = useState<string | null>(null);
+  const [lastRecipient, setLastRecipient] = useState<string | null>(null);
 
   useEffect(() => {
     if (instanceName) {
-      const difyConfig = getDifyConfig(instanceName);
-      const n8nConfig = getN8nConfig(instanceName);
+      // Remover o sufixo "_Cliente" do nome da instância para verificar as configurações
+      const baseInstanceName = instanceName.replace("_Cliente", "");
+      
+      const difyConfig = getDifyConfig(baseInstanceName);
+      const n8nConfig = getN8nConfig(baseInstanceName);
       
       setDifyActive(!!difyConfig);
       setN8nActive(!!n8nConfig);
@@ -66,6 +71,8 @@ const BotStatus: React.FC<BotStatusProps> = ({ instanceName }) => {
           title: "Mensagem enviada",
           description: "A mensagem de teste foi enviada com sucesso",
         });
+        setLastSentMessage(testMessage);
+        setLastRecipient(recipient);
         setTestMessage("");
       } else {
         throw new Error("Falha ao enviar mensagem");
@@ -104,6 +111,11 @@ const BotStatus: React.FC<BotStatusProps> = ({ instanceName }) => {
                   ? "Integração ativa e pronta para processar mensagens" 
                   : "Integração não configurada"}
               </p>
+              {difyActive && (
+                <div className="mt-2 text-xs text-gray-400">
+                  Webhook configurado e recebendo mensagens do WhatsApp
+                </div>
+              )}
             </div>
             
             <div className={`p-4 border rounded-md ${n8nActive ? 'bg-green-900/20 border-green-500/30' : 'bg-gray-800/50 border-gray-700'}`}>
@@ -116,6 +128,11 @@ const BotStatus: React.FC<BotStatusProps> = ({ instanceName }) => {
                   ? "Integração ativa e pronta para processar mensagens" 
                   : "Integração não configurada"}
               </p>
+              {n8nActive && (
+                <div className="mt-2 text-xs text-gray-400">
+                  Webhook configurado e enviando mensagens para n8n
+                </div>
+              )}
             </div>
           </div>
           
@@ -171,16 +188,26 @@ const BotStatus: React.FC<BotStatusProps> = ({ instanceName }) => {
                 </p>
               )}
             </form>
+            
+            {lastSentMessage && lastRecipient && (
+              <div className="mt-4 p-3 bg-green-900/20 border border-green-500/30 rounded-md">
+                <p className="text-green-400 font-medium">Última mensagem enviada:</p>
+                <div className="mt-2 text-gray-300 text-sm">
+                  <p className="mb-1"><strong>Para:</strong> {lastRecipient}</p>
+                  <p><strong>Mensagem:</strong> {lastSentMessage}</p>
+                </div>
+              </div>
+            )}
           </div>
           
           {/* Informações sobre o funcionamento */}
           <div className="p-4 bg-gray-900/50 border border-gray-800 rounded-md">
             <h3 className="font-medium text-white mb-2">Como funciona:</h3>
             <ul className="list-disc list-inside space-y-1 text-gray-300 text-sm">
-              <li>Mensagens recebidas no WhatsApp serão processadas pelo bot configurado</li>
-              <li>Se o Dify estiver ativo, as mensagens serão processadas pelo assistente IA</li>
-              <li>Se o n8n estiver ativo, as mensagens acionarão os fluxos de automação configurados</li>
-              <li>As respostas serão enviadas automaticamente de volta ao WhatsApp</li>
+              <li>Mensagens recebidas no WhatsApp são automaticamente processadas pelo bot configurado</li>
+              <li>Se o Dify estiver ativo, as mensagens são analisadas pela IA e respostas enviadas automaticamente</li>
+              <li>Se o n8n estiver ativo, as mensagens acionam os fluxos de automação configurados</li>
+              <li>Não são necessárias outras configurações, o sistema funciona automaticamente após a integração</li>
             </ul>
           </div>
         </div>

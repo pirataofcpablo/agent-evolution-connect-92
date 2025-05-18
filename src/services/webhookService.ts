@@ -31,6 +31,13 @@ export const registerWebhook = async (instanceName: string, webhookUrl: string):
     };
 
     const response = await fetch(`${EVO_API_URL}/instance/webhook`, options);
+    
+    if (response.ok) {
+      console.log(`Webhook registrado com sucesso para ${instanceName}`);
+    } else {
+      console.error(`Falha ao registrar webhook para ${instanceName}:`, await response.text());
+    }
+    
     return response.ok;
   } catch (error) {
     console.error("Erro ao registrar webhook:", error);
@@ -63,7 +70,15 @@ export const sendWhatsAppMessage = async (
       })
     };
 
+    console.log(`Enviando mensagem para ${recipient} via ${instanceName}`);
     const response = await fetch(`${EVO_API_URL}/message/sendText/${instanceName}`, options);
+    
+    if (response.ok) {
+      console.log("Mensagem enviada com sucesso");
+    } else {
+      console.error("Erro ao enviar mensagem:", await response.text());
+    }
+    
     return response.ok;
   } catch (error) {
     console.error("Erro ao enviar mensagem:", error);
@@ -74,31 +89,42 @@ export const sendWhatsAppMessage = async (
 // Processar mensagem recebida e rotear para o bot apropriado
 export const processIncomingMessage = async (message: WhatsAppMessage): Promise<void> => {
   const { instanceName, sender, message: text } = message;
+  console.log(`Processando mensagem recebida de ${sender} na instância ${instanceName}: "${text}"`);
+  
+  const baseInstanceName = instanceName.replace("_Cliente", "");
   
   // Verificar se há integração com Dify configurada
-  const difyConfig = getDifyConfig(instanceName);
+  const difyConfig = getDifyConfig(baseInstanceName);
   if (difyConfig) {
     try {
+      console.log("Integração Dify encontrada. Processando mensagem...");
       // Processar mensagem com Dify
       const response = await sendMessageToDify(text, difyConfig);
       
       // Enviar resposta de volta para o WhatsApp
       await sendWhatsAppMessage(instanceName, sender, response);
+      console.log(`Resposta Dify enviada para ${sender}: "${response}"`);
       return;
     } catch (error) {
       console.error("Erro ao processar mensagem com Dify:", error);
     }
+  } else {
+    console.log("Nenhuma integração Dify encontrada para", baseInstanceName);
   }
   
   // Se falhou ou não tem Dify, tentar com n8n
-  const n8nConfig = getN8nConfig(instanceName);
+  const n8nConfig = getN8nConfig(baseInstanceName);
   if (n8nConfig) {
     try {
+      console.log("Integração n8n encontrada. Processando mensagem...");
       // Enviar mensagem para o n8n (webhook ou API)
       await sendMessageToN8n(text, sender, n8nConfig);
+      console.log(`Mensagem encaminhada para n8n: ${text}`);
     } catch (error) {
       console.error("Erro ao processar mensagem com n8n:", error);
     }
+  } else {
+    console.log("Nenhuma integração n8n encontrada para", baseInstanceName);
   }
 };
 
