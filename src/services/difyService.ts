@@ -7,12 +7,22 @@ interface DifyConfig {
 }
 
 export const saveDifyConfig = (instanceName: string, config: DifyConfig): void => {
-  localStorage.setItem(`dify_config_${instanceName}`, JSON.stringify(config));
+  try {
+    localStorage.setItem(`dify_config_${instanceName}`, JSON.stringify(config));
+    console.log(`Configuração Dify salva para ${instanceName}:`, config);
+  } catch (error) {
+    console.error(`Erro ao salvar configuração Dify para ${instanceName}:`, error);
+  }
 };
 
 export const getDifyConfig = (instanceName: string): DifyConfig | null => {
-  const config = localStorage.getItem(`dify_config_${instanceName}`);
-  return config ? JSON.parse(config) : null;
+  try {
+    const config = localStorage.getItem(`dify_config_${instanceName}`);
+    return config ? JSON.parse(config) : null;
+  } catch (error) {
+    console.error(`Erro ao recuperar configuração Dify para ${instanceName}:`, error);
+    return null;
+  }
 };
 
 // Nova função para testar a conexão com o Dify
@@ -21,6 +31,8 @@ export const testDifyConnection = async (config: DifyConfig): Promise<boolean> =
     const endpoint = config.modelType === 'chat' 
       ? `/chat-messages` 
       : `/completion-messages`;
+    
+    console.log(`Testando conexão Dify com endpoint: ${config.apiUrl}${endpoint}`);
     
     const response = await fetch(`${config.apiUrl}${endpoint}`, {
       method: 'POST',
@@ -118,6 +130,8 @@ export const registerDifyBot = async (
         events: ["messages.upsert"]
       })
     };
+
+    console.log("Enviando requisição para registrar webhook:", options);
 
     const response = await fetch(`${EVO_API_URL}/instance/webhook`, options);
     const responseData = await response.json();

@@ -20,33 +20,45 @@ const Index = () => {
   
   // Verifica se há uma instância conectada ao carregar a página
   useEffect(() => {
-    const storedInstanceName = localStorage.getItem('instanceName');
-    const storedInstanceStatus = localStorage.getItem('instanceStatus');
-    
-    if (storedInstanceName && storedInstanceStatus && storedInstanceStatus !== "Desligada") {
-      const baseInstanceName = storedInstanceName.replace("_Cliente", "");
-      setInstanceConnected(true);
-      setInstanceName(baseInstanceName);
-      console.log("Instância conectada:", baseInstanceName);
+    try {
+      const storedInstanceName = localStorage.getItem('instanceName');
+      const storedInstanceStatus = localStorage.getItem('instanceStatus');
       
-      // Verificar se há configurações para Dify e n8n
-      const difyConfig = getDifyConfig(baseInstanceName);
-      const n8nConfig = getN8nConfig(baseInstanceName);
+      console.log("Verificando instância:", storedInstanceName, storedInstanceStatus);
       
-      console.log("Configuração Dify:", difyConfig ? "Encontrada" : "Não encontrada");
-      console.log("Configuração n8n:", n8nConfig ? "Encontrada" : "Não encontrada");
-      
-      setDifyConfigured(!!difyConfig);
-      setN8nConfigured(!!n8nConfig);
-      
-      // Redirecionar para status se já estiver configurado
-      if (difyConfig || n8nConfig) {
-        setActiveTab("status");
-        toast({
-          title: "Serviços Ativos",
-          description: `${difyConfig ? "Dify IA" : ""}${difyConfig && n8nConfig ? " e " : ""}${n8nConfig ? "n8n" : ""} configurados e ativos`,
-        });
+      if (storedInstanceName && storedInstanceStatus && storedInstanceStatus !== "Desligada") {
+        const baseInstanceName = storedInstanceName.replace("_Cliente", "");
+        setInstanceConnected(true);
+        setInstanceName(baseInstanceName);
+        console.log("Instância conectada:", baseInstanceName);
+        
+        // Verificar se há configurações para Dify e n8n
+        try {
+          const difyConfig = getDifyConfig(baseInstanceName);
+          const n8nConfig = getN8nConfig(baseInstanceName);
+          
+          console.log("Configuração Dify:", difyConfig ? "Encontrada" : "Não encontrada");
+          console.log("Configuração n8n:", n8nConfig ? "Encontrada" : "Não encontrada");
+          
+          setDifyConfigured(!!difyConfig);
+          setN8nConfigured(!!n8nConfig);
+          
+          // Redirecionar para status se já estiver configurado
+          if (difyConfig || n8nConfig) {
+            setActiveTab("status");
+            toast({
+              title: "Serviços Ativos",
+              description: `${difyConfig ? "Dify IA" : ""}${difyConfig && n8nConfig ? " e " : ""}${n8nConfig ? "n8n" : ""} configurados e ativos`,
+            });
+          }
+        } catch (error) {
+          console.error("Erro ao verificar configurações:", error);
+        }
+      } else {
+        console.log("Nenhuma instância conectada");
       }
+    } catch (error) {
+      console.error("Erro ao carregar dados da instância:", error);
     }
   }, []);
 

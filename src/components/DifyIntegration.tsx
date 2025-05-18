@@ -26,14 +26,23 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
   
   // Carregar configuração se existir
   useEffect(() => {
-    const savedConfig = getDifyConfig(instanceName);
-    if (savedConfig) {
-      setApiKey(savedConfig.apiKey);
-      setApiUrl(savedConfig.apiUrl);
-      setApplicationId(savedConfig.applicationId);
-      setModelType(savedConfig.modelType);
-      setIntegrationComplete(true);
-      setConnectionSuccess(true);
+    if (!instanceName) return;
+    
+    try {
+      const savedConfig = getDifyConfig(instanceName);
+      if (savedConfig) {
+        console.log("Configuração Dify encontrada para", instanceName);
+        setApiKey(savedConfig.apiKey);
+        setApiUrl(savedConfig.apiUrl);
+        setApplicationId(savedConfig.applicationId);
+        setModelType(savedConfig.modelType);
+        setIntegrationComplete(true);
+        setConnectionSuccess(true);
+      } else {
+        console.log("Nenhuma configuração Dify encontrada para", instanceName);
+      }
+    } catch (error) {
+      console.error("Erro ao carregar configuração Dify:", error);
     }
   }, [instanceName]);
 
@@ -98,6 +107,10 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
     setRegistrationError(null);
     
     try {
+      if (!instanceName) {
+        throw new Error("Nome da instância não fornecido");
+      }
+      
       const fullInstanceName = `${instanceName}_Cliente`;
       
       console.log("Iniciando integração com Dify para a instância:", fullInstanceName);
@@ -140,7 +153,7 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
       });
     } catch (error: any) {
       console.error("Erro ao realizar integração:", error);
-      setRegistrationError(error.message);
+      setRegistrationError(error.message || "Erro desconhecido");
       toast({
         title: "Erro",
         description: error.message || "Houve um erro ao realizar a integração do Dify.",
@@ -148,6 +161,18 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Função de cancelamento segura
+  const handleCancel = () => {
+    console.log("Cancelando operação");
+    // Redirecionamento seguro sem manipular DOM diretamente
+    if (document.querySelector('[value="overview"]')) {
+      setApiKey("");
+      setApiUrl("https://api.dify.ai/v1");
+      setApplicationId("");
+      setModelType("chat");
     }
   };
 
@@ -248,7 +273,7 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
           <div className="p-3 bg-gray-800 rounded-md">
             <div className="flex justify-between">
               <span className="text-gray-300">Instância conectada:</span>
-              <span className="text-blue-400">{instanceName}</span>
+              <span className="text-blue-400">{instanceName || "Nenhuma"}</span>
             </div>
           </div>
         </div>
@@ -279,6 +304,7 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
           <Button 
             type="button" 
             variant="outline"
+            onClick={handleCancel}
             className="border-gray-600 hover:bg-gray-800 hover:text-white"
           >
             Cancelar
