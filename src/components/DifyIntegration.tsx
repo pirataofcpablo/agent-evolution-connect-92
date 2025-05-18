@@ -164,16 +164,14 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
     }
   };
 
-  // Função de cancelamento segura
+  // Função de cancelamento segura sem manipulação direta do DOM
   const handleCancel = () => {
     console.log("Cancelando operação");
-    // Redirecionamento seguro sem manipular DOM diretamente
-    if (document.querySelector('[value="overview"]')) {
-      setApiKey("");
-      setApiUrl("https://api.dify.ai/v1");
-      setApplicationId("");
-      setModelType("chat");
-    }
+    setApiKey("");
+    setApiUrl("https://api.dify.ai/v1");
+    setApplicationId("");
+    setModelType("chat");
+    // Navegação será tratada pelo componente pai se necessário
   };
 
   return (

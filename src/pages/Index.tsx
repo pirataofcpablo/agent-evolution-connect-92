@@ -62,6 +62,11 @@ const Index = () => {
     }
   }, []);
 
+  // Função segura para mudar de aba
+  const handleTabChange = (value: string) => {
+    setActiveTab(value);
+  };
+
   return (
     <div className="min-h-screen flex flex-col bg-black text-white">
       <Header />
@@ -72,7 +77,7 @@ const Index = () => {
         <div className="flex-1 p-6 mx-auto max-w-7xl">
           <h1 className="text-3xl font-bold mb-6">Sistema SAAS de Agentes IA</h1>
           
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
             <TabsList className="grid grid-cols-3 mb-8">
               <TabsTrigger value="conexao">📲 Conectar</TabsTrigger>
               <TabsTrigger value="bots">🤖 Integrar Bots</TabsTrigger>

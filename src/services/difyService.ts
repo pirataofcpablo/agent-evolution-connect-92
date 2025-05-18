@@ -134,16 +134,16 @@ export const registerDifyBot = async (
     console.log("Enviando requisição para registrar webhook:", options);
 
     const response = await fetch(`${EVO_API_URL}/instance/webhook`, options);
-    const responseData = await response.json();
-    console.log("Resposta do registro do webhook:", responseData);
     
-    if (response.ok) {
-      console.log("Webhook registrado com sucesso!");
-      return true;
-    } else {
+    if (!response.ok) {
+      const responseData = await response.json().catch(() => ({}));
       console.error("Erro ao registrar webhook:", responseData);
       return false;
     }
+    
+    const responseData = await response.json();
+    console.log("Resposta do registro do webhook:", responseData);
+    return true;
   } catch (error) {
     console.error("Erro ao registrar webhook do Dify:", error);
     return false;
