@@ -7,6 +7,8 @@ import {
   connectToInstance,
   logoutInstance,
   deleteInstance,
+  checkInstanceExists,
+  fetchAllInstances,
   EvoInstance
 } from '@/services/evoService';
 import { registerWebhook } from '@/services/webhookService';
@@ -20,6 +22,7 @@ interface UseEvoInstanceReturn {
   createInstance: (name: string) => Promise<void>;
   logout: () => Promise<void>;
   deleteInst: () => Promise<void>;
+  refreshInstanceStatus: () => Promise<void>;
 }
 
 export const useEvoInstance = (): UseEvoInstanceReturn => {
@@ -34,11 +37,57 @@ export const useEvoInstance = (): UseEvoInstanceReturn => {
     const storedName = localStorage.getItem('instanceName');
     const storedStatus = localStorage.getItem('instanceStatus');
     
-    if (storedName && storedStatus) {
+    if (storedName) {
       setInstanceName(storedName);
+      
+      // Se temos um nome armazenado, vamos verificar o status real na API
+      refreshInstanceStatus();
+    } else if (storedStatus) {
       setInstanceStatus(storedStatus);
     }
   }, []);
+  
+  // Função para atualizar o status da instância diretamente da API
+  const refreshInstanceStatus = async () => {
+    const storedName = localStorage.getItem('instanceName');
+    if (!storedName) return;
+    
+    try {
+      console.log(`Atualizando status da instância: ${storedName}`);
+      setLoading(true);
+      
+      // Buscar todas as instâncias
+      const instances = await fetchAllInstances();
+      
+      // Verificar possíveis formatos do nome (com ou sem sufixo _Cliente)
+      const possibleNames = [
+        storedName,
+        storedName.endsWith("_Cliente") ? storedName : `${storedName}_Cliente`,
+        storedName.replace("_Cliente", "")
+      ];
+      
+      // Encontrar a instância que corresponde a um dos possíveis nomes
+      const foundInstance = instances.find(instance => 
+        possibleNames.some(name => 
+          instance.instanceName?.toLowerCase() === name.toLowerCase()
+        )
+      );
+      
+      if (foundInstance) {
+        console.log(`Instância encontrada: ${foundInstance.instanceName} com status: ${foundInstance.status}`);
+        setInstanceStatus(foundInstance.status || "Desconhecido");
+        localStorage.setItem('instanceStatus', foundInstance.status || "Desconhecido");
+      } else {
+        console.log(`Instância não encontrada. Possibilidade de estar desconectada ou excluída.`);
+        setInstanceStatus("Desconhecida");
+        localStorage.setItem('instanceStatus', "Desconhecida");
+      }
+    } catch (error) {
+      console.error("Erro ao atualizar status da instância:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Criar instância e workspace
   const createInstance = async (name: string) => {
@@ -47,7 +96,28 @@ export const useEvoInstance = (): UseEvoInstanceReturn => {
     try {
       const fullInstanceName = `${name}_Cliente`;
       
-      // Criar instância
+      // Verificar se a instância já existe
+      const instanceCheck = await checkInstanceExists(fullInstanceName);
+      if (instanceCheck.exists) {
+        console.log(`Instância ${fullInstanceName} já existe com status: ${instanceCheck.status}`);
+        setInstanceName(fullInstanceName);
+        setInstanceStatus(instanceCheck.status || "On");
+        localStorage.setItem('instanceName', fullInstanceName);
+        localStorage.setItem('instanceStatus', instanceCheck.status || "On");
+        
+        if (instanceCheck.status !== "CONNECTED" && instanceCheck.status !== "ONLINE" && instanceCheck.status !== "On") {
+          // Se existir mas não estiver conectada, tentar reconectar
+          await connectToInstance(fullInstanceName);
+        }
+        
+        toast({
+          title: "Instância Existente",
+          description: `A instância ${name} já existe e foi recuperada.`,
+        });
+        return;
+      }
+      
+      // Criar nova instância
       const instance: EvoInstance = await createEvoInstance(name);
       
       if (instance.qrcode?.base64) {
@@ -154,6 +224,7 @@ export const useEvoInstance = (): UseEvoInstanceReturn => {
     error,
     createInstance,
     logout,
-    deleteInst
+    deleteInst,
+    refreshInstanceStatus
   };
 };

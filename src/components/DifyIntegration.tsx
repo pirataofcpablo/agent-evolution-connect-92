@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { toast } from "@/components/ui/use-toast";
 import { Input } from "@/components/ui/input";
@@ -5,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { saveDifyConfig, getDifyConfig, testDifyConnection, registerDifyBot } from '@/services/difyService';
+import { saveDifyConfig, getDifyConfig, testDifyConnection, registerDifyBot, checkInstanceStatus } from '@/services/difyService';
 import { Loader2, Bot, CheckCircle, AlertCircle, InfoIcon } from "lucide-react";
 
 interface DifyIntegrationProps {
@@ -22,15 +23,49 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
   const [integrationComplete, setIntegrationComplete] = useState(false);
   const [testingConnection, setTestingConnection] = useState(false);
   const [registrationError, setRegistrationError] = useState<string | null>(null);
+  const [instanceVerifying, setInstanceVerifying] = useState(false);
+  const [instanceStatus, setInstanceStatus] = useState<{exists: boolean, connected: boolean} | null>(null);
+  
+  // Verificar status da instância quando o componente é montado
+  useEffect(() => {
+    const verifyInstance = async () => {
+      if (!instanceName) return;
+      
+      setInstanceVerifying(true);
+      try {
+        console.log(`Verificando status da instância: ${instanceName}`);
+        const status = await checkInstanceStatus(instanceName);
+        setInstanceStatus(status);
+        
+        if (!status.exists) {
+          setRegistrationError(`A instância ${instanceName} não foi encontrada. Verifique se você criou e conectou corretamente.`);
+        } else if (!status.connected) {
+          setRegistrationError(`A instância ${instanceName} existe, mas não está conectada. Volte à aba Conectar e escaneie o QR Code.`);
+        } else {
+          setRegistrationError(null);
+          console.log(`Instância ${instanceName} verificada e está conectada!`);
+        }
+      } catch (error) {
+        console.error("Erro ao verificar instância:", error);
+      } finally {
+        setInstanceVerifying(false);
+      }
+    };
+    
+    verifyInstance();
+  }, [instanceName]);
   
   // Carregar configuração se existir
   useEffect(() => {
     if (!instanceName) return;
     
     try {
-      const savedConfig = getDifyConfig(instanceName);
+      // Normalizar nome da instância removendo sufixo _Cliente
+      const normalizedName = instanceName.replace("_Cliente", "");
+      
+      const savedConfig = getDifyConfig(normalizedName);
       if (savedConfig) {
-        console.log("Configuração Dify encontrada para", instanceName);
+        console.log("Configuração Dify encontrada para", normalizedName);
         setApiKey(savedConfig.apiKey);
         setApiUrl(savedConfig.apiUrl);
         setApplicationId(savedConfig.applicationId);
@@ -38,7 +73,7 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
         setIntegrationComplete(true);
         setConnectionSuccess(true);
       } else {
-        console.log("Nenhuma configuração Dify encontrada para", instanceName);
+        console.log("Nenhuma configuração Dify encontrada para", normalizedName);
       }
     } catch (error) {
       console.error("Erro ao carregar configuração Dify:", error);
@@ -113,6 +148,16 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
         throw new Error("Nome da instância não fornecido");
       }
       
+      // Verificar status da instância antes de prosseguir
+      const status = await checkInstanceStatus(instanceName);
+      if (!status.exists) {
+        throw new Error(`Instância ${instanceName} não encontrada. Verifique se você criou a instância corretamente.`);
+      }
+      
+      if (!status.connected) {
+        throw new Error(`Instância ${instanceName} existe, mas não está conectada. Conecte-a primeiro na aba Conectar.`);
+      }
+      
       console.log(`Iniciando integração com Dify para a instância: ${instanceName}`);
       console.log(`Status da conexão antes do registro: ${connectionSuccess ? "Conectado" : "Não conectado"}`);
       
@@ -137,8 +182,6 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
       // Registrar o bot Dify na Evolution API
       console.log(`Registrando bot Dify para a instância: ${instanceName}`);
       await registerDifyBot(instanceName, config);
-      
-      // Configuração já foi salva dentro da função registerDifyBot
       
       setIntegrationComplete(true);
       toast({
@@ -176,6 +219,46 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
           instância WhatsApp.
         </p>
       </div>
+
+      {/* Verificação de instância */}
+      {instanceVerifying ? (
+        <div className="flex items-center justify-center p-6">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+          <span className="ml-2 text-gray-300">Verificando status da instância...</span>
+        </div>
+      ) : (
+        <>
+          {instanceStatus && instanceStatus.exists && instanceStatus.connected && (
+            <Alert className="bg-green-900/20 border-green-500/30 mb-4">
+              <CheckCircle className="h-5 w-5 text-green-400" />
+              <AlertTitle className="text-green-400">Instância Verificada</AlertTitle>
+              <AlertDescription className="text-gray-300">
+                A instância {instanceName} está conectada e pronta para integração.
+              </AlertDescription>
+            </Alert>
+          )}
+          
+          {instanceStatus && instanceStatus.exists && !instanceStatus.connected && (
+            <Alert className="bg-yellow-900/20 border-yellow-500/30 mb-4">
+              <AlertCircle className="h-5 w-5 text-yellow-400" />
+              <AlertTitle className="text-yellow-400">Instância Desconectada</AlertTitle>
+              <AlertDescription className="text-gray-300">
+                A instância {instanceName} existe, mas não está conectada. Volte à aba Conectar e escaneie o QR Code.
+              </AlertDescription>
+            </Alert>
+          )}
+          
+          {instanceStatus && !instanceStatus.exists && (
+            <Alert className="bg-red-900/20 border-red-500/30 mb-4">
+              <AlertCircle className="h-5 w-5 text-red-400" />
+              <AlertTitle className="text-red-400">Instância Não Encontrada</AlertTitle>
+              <AlertDescription className="text-gray-300">
+                A instância {instanceName} não foi encontrada. Verifique se você criou e nomeou corretamente.
+              </AlertDescription>
+            </Alert>
+          )}
+        </>
+      )}
 
       {integrationComplete && (
         <Alert className="bg-green-900/20 border-green-500/30">
@@ -309,7 +392,8 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
           </Button>
           <Button 
             type="submit" 
-            disabled={isLoading || integrationComplete || !connectionSuccess}
+            disabled={isLoading || integrationComplete || !connectionSuccess || 
+                     (instanceStatus && (!instanceStatus.exists || !instanceStatus.connected))}
             className="bg-blue-600 hover:bg-blue-700"
           >
             {isLoading ? (

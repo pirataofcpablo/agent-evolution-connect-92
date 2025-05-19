@@ -2,6 +2,7 @@
 // API Evo service for WhatsApp connection
 
 const API_KEY = "29MoyRfK6RM0CWCOXnReOpAj6dIYTt3z";
+const API_URL = "https://v2.solucoesweb.uk";
 
 export interface EvoInstance {
   instanceName: string;
@@ -29,7 +30,7 @@ export const createEvoInstance = async (name: string): Promise<EvoInstance> => {
   };
 
   try {
-    const response = await fetch('https://v2.solucoesweb.uk/instance/create', options);
+    const response = await fetch(`${API_URL}/instance/create`, options);
     
     if (!response.ok) {
       throw new Error(`Erro na requisição: ${response.status} ${response.statusText}`);
@@ -40,6 +41,30 @@ export const createEvoInstance = async (name: string): Promise<EvoInstance> => {
   } catch (error) {
     console.error('Erro ao criar instância:', error);
     throw error;
+  }
+};
+
+export const fetchAllInstances = async (): Promise<EvoInstance[]> => {
+  const options = {
+    method: 'GET',
+    headers: {
+      'apikey': API_KEY,
+      'Content-Type': 'application/json'
+    }
+  };
+
+  try {
+    const response = await fetch(`${API_URL}/instance/fetchInstances`, options);
+    
+    if (!response.ok) {
+      throw new Error(`Erro ao buscar instâncias: ${response.status} ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    return Array.isArray(data) ? data : [];
+  } catch (error) {
+    console.error('Erro ao buscar instâncias:', error);
+    return [];
   }
 };
 
@@ -85,12 +110,45 @@ export const connectToInstance = async (instanceName: string): Promise<any> => {
   };
 
   try {
-    const response = await fetch(`https://v2.solucoesweb.uk/instance/connect/${instanceName}`, options);
+    const response = await fetch(`${API_URL}/instance/connect/${instanceName}`, options);
     const data = await response.json();
     return data;
   } catch (error) {
     console.error('Erro ao conectar à instância:', error);
     throw error;
+  }
+};
+
+export const checkInstanceExists = async (instanceName: string): Promise<{exists: boolean, status?: string}> => {
+  try {
+    // Buscar todas as instâncias
+    const instances = await fetchAllInstances();
+    
+    // Verificar possíveis formatos do nome (com ou sem sufixo _Cliente)
+    const possibleNames = [
+      instanceName,
+      instanceName.endsWith("_Cliente") ? instanceName : `${instanceName}_Cliente`,
+      instanceName.replace("_Cliente", "")
+    ];
+    
+    // Verificar se algum dos possíveis nomes existe nas instâncias
+    const foundInstance = instances.find(instance => 
+      possibleNames.some(name => 
+        instance.instanceName?.toLowerCase() === name.toLowerCase()
+      )
+    );
+    
+    if (foundInstance) {
+      return { 
+        exists: true, 
+        status: foundInstance.status 
+      };
+    }
+    
+    return { exists: false };
+  } catch (error) {
+    console.error("Erro ao verificar existência da instância:", error);
+    return { exists: false };
   }
 };
 
@@ -103,7 +161,7 @@ export const logoutInstance = async (instanceName: string): Promise<any> => {
   };
 
   try {
-    const response = await fetch(`https://v2.solucoesweb.uk/instance/logout/${instanceName}`, options);
+    const response = await fetch(`${API_URL}/instance/logout/${instanceName}`, options);
     return await response.json();
   } catch (error) {
     console.error('Erro ao desconectar instância:', error);
@@ -120,7 +178,7 @@ export const deleteInstance = async (instanceName: string): Promise<any> => {
   };
 
   try {
-    const response = await fetch(`https://v2.solucoesweb.uk/instance/delete/${instanceName}`, options);
+    const response = await fetch(`${API_URL}/instance/delete/${instanceName}`, options);
     return await response.json();
   } catch (error) {
     console.error('Erro ao excluir instância:', error);

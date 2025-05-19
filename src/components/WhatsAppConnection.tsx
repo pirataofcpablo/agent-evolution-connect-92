@@ -1,9 +1,10 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { MessageSquare, QrCode, Link, Unlink, Trash2, Check } from "lucide-react";
+import { MessageSquare, QrCode, Link, Unlink, Trash2, Check, RefreshCw } from "lucide-react";
 import { useEvoInstance } from '@/hooks/useEvoInstance';
+import { Button } from "@/components/ui/button";
 
 const WhatsAppConnection: React.FC = () => {
   const [instanceNameInput, setInstanceNameInput] = useState('');
@@ -15,8 +16,21 @@ const WhatsAppConnection: React.FC = () => {
     error,
     createInstance,
     logout,
-    deleteInst
+    deleteInst,
+    refreshInstanceStatus
   } = useEvoInstance();
+  
+  const [refreshing, setRefreshing] = useState(false);
+  
+  // Função para atualizar o status
+  const handleRefreshStatus = async () => {
+    setRefreshing(true);
+    try {
+      await refreshInstanceStatus();
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,6 +38,13 @@ const WhatsAppConnection: React.FC = () => {
       createInstance(instanceNameInput.trim());
     }
   };
+  
+  // Verificar status ao montar o componente
+  useEffect(() => {
+    if (instanceName) {
+      refreshInstanceStatus();
+    }
+  }, [instanceName]);
 
   return (
     <Card className="border-blue-500/20 bg-black">
@@ -85,9 +106,25 @@ const WhatsAppConnection: React.FC = () => {
           </div>
         ) : (
           <div className="p-4 bg-green-900/20 border border-green-500/30 rounded-md">
-            <div className="flex items-center space-x-2 text-green-400 mb-2">
-              <Check className="h-5 w-5" />
-              <h3 className="font-medium">Instância Conectada</h3>
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center space-x-2 text-green-400">
+                <Check className="h-5 w-5" />
+                <h3 className="font-medium">Instância Conectada</h3>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleRefreshStatus}
+                disabled={refreshing}
+                className="border-green-500 text-green-400 hover:bg-green-900/20"
+              >
+                {refreshing ? (
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4" />
+                )}
+                <span className="ml-1">{refreshing ? "Atualizando..." : "Atualizar status"}</span>
+              </Button>
             </div>
             <div className="mb-4">
               <p className="text-gray-300">Nome: {instanceName?.replace("_Cliente", "")}</p>
@@ -96,14 +133,14 @@ const WhatsAppConnection: React.FC = () => {
             <div className="flex flex-wrap gap-2">
               <button 
                 onClick={logout}
-                disabled={loading}
+                disabled={loading || refreshing}
                 className="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-md transition-colors flex items-center gap-2"
               >
                 <Unlink className="w-4 h-4" /> Desconectar
               </button>
               <button 
                 onClick={deleteInst}
-                disabled={loading}
+                disabled={loading || refreshing}
                 className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md transition-colors flex items-center gap-2"
               >
                 <Trash2 className="w-4 h-4" /> Excluir Instância

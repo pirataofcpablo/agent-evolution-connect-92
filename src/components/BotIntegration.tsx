@@ -1,11 +1,13 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/components/ui/use-toast";
+import { checkInstanceStatus } from '@/services/difyService';
 import DifyIntegration from './DifyIntegration';
 import N8nIntegration from './N8nIntegration';
 import IntegrationCard from './IntegrationCard';
+import { Loader2 } from 'lucide-react';
 
 interface BotIntegrationProps {
   instanceConnected: boolean;
@@ -13,10 +15,63 @@ interface BotIntegrationProps {
 }
 
 const BotIntegration: React.FC<BotIntegrationProps> = ({ 
-  instanceConnected,
-  instanceName 
+  instanceConnected: initialInstanceConnected,
+  instanceName: initialInstanceName 
 }) => {
   const [activeTab, setActiveTab] = useState("overview");
+  const [verifyingInstance, setVerifyingInstance] = useState(false);
+  const [instanceConnected, setInstanceConnected] = useState(initialInstanceConnected);
+  const [instanceName, setInstanceName] = useState(initialInstanceName);
+  const [instanceError, setInstanceError] = useState<string | null>(null);
+  
+  // Verificar o status da instância quando o componente é montado
+  useEffect(() => {
+    const verifyInstance = async () => {
+      if (!initialInstanceName) {
+        setInstanceConnected(false);
+        return;
+      }
+      
+      setVerifyingInstance(true);
+      try {
+        const status = await checkInstanceStatus(initialInstanceName);
+        setInstanceConnected(status.exists && status.connected);
+        
+        if (!status.exists) {
+          setInstanceError(`Instância ${initialInstanceName} não encontrada. Verifique se você criou e conectou corretamente.`);
+        } else if (!status.connected) {
+          setInstanceError(`Instância ${initialInstanceName} encontrada, mas não está conectada. Volte à aba Conectar e escaneie o QR Code.`);
+        } else {
+          setInstanceError(null);
+        }
+      } catch (error) {
+        console.error("Erro ao verificar instância:", error);
+        setInstanceConnected(false);
+      } finally {
+        setVerifyingInstance(false);
+      }
+    };
+    
+    verifyInstance();
+  }, [initialInstanceName]);
+
+  if (verifyingInstance) {
+    return (
+      <Card className="border-blue-500/20 bg-black">
+        <CardHeader>
+          <CardTitle className="text-xl text-blue-400">Integração de Bots</CardTitle>
+          <CardDescription className="text-gray-400">
+            Verificando instância...
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-center p-12">
+            <Loader2 className="h-12 w-12 animate-spin text-blue-500" />
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   if (!instanceConnected) {
     return (
@@ -32,7 +87,7 @@ const BotIntegration: React.FC<BotIntegrationProps> = ({
             <div className="text-yellow-400 text-5xl mb-4">⚠️</div>
             <h3 className="text-xl font-medium text-white mb-2">Instância não conectada</h3>
             <p className="text-gray-300">
-              Você precisa conectar uma instância primeiro para poder integrar bots.
+              {instanceError || "Você precisa conectar uma instância primeiro para poder integrar bots."}
             </p>
             <button 
               onClick={() => document.querySelector('[value="conexao"]')?.dispatchEvent(new Event('click'))}
