@@ -1,4 +1,3 @@
-
 // API Evo service for WhatsApp connection
 
 interface DifyConfig {
@@ -315,10 +314,9 @@ export const registerDifyBot = async (
       url: `${EVO_API_URL}/webhook/set`,
       method: 'POST',
       body: {
-        webhook: {
-          url: difyApiUrl,
-          apiKey: config.apiKey
-        },
+        // Fix the error: Remove the 'webhook' property and add properties directly
+        url: difyApiUrl,
+        apiKey: config.apiKey,
         events: ["all"],
         enabled: true,
         type: "dify",
@@ -345,8 +343,9 @@ export const registerDifyBot = async (
           method: 'POST',
           body: {
             ...currentSettings,
-            webhook: {
-              ...currentSettings?.webhook,
+            // Fix webhook property structure
+            webhooks: {
+              ...currentSettings?.webhooks,
               dify: {
                 url: difyApiUrl,
                 apiKey: config.apiKey,
