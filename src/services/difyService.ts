@@ -225,7 +225,7 @@ export const sendMessageToDify = async (
   }
 };
 
-// NOVA IMPLEMENTAÇÃO - Função melhorada para registro automático do bot Dify
+// Função melhorada para registro automático do bot Dify
 export const registerDifyBot = async (
   instanceName: string, 
   config: DifyConfig
@@ -263,110 +263,73 @@ export const registerDifyBot = async (
       difyApiUrl = difyApiUrl.endsWith('/') ? `${difyApiUrl}v1` : `${difyApiUrl}/v1`;
     }
     
-    // Detectar a versão e interface da Evolution API verificando endpoints específicos
-    console.log("Detectando versão da Evolution API...");
-    
-    // Verificar primeiro se há suporte à interface específica para Dify
-    // Nova abordagem: Primeiro verificar se o endpoint de configuração específica do Dify existe
-    try {
-      const configCheck = await fetch(`${EVO_API_URL}/instance/webhook/list`, {
-        method: 'GET',
-        headers: {
-          'apikey': EVO_API_KEY,
-          'Content-Type': 'application/json'
+    // Criar array com diferentes formatos de endpoints para tentar
+    const endpointFormats = [
+      // Formato para API mais recente
+      { 
+        url: `${EVO_API_URL}/instance/dify/${exactInstanceName}`,
+        method: 'POST',
+        body: {
+          difyUrl: difyApiUrl,
+          difyApiKey: config.apiKey,
+          enabled: true
         }
-      });
-      
-      if (configCheck.ok) {
-        console.log("Detectado endpoint de listagem de webhook, usando interface mais recente");
-        
-        // Registrar o webhook usando a interface moderna v2 (instance/webhook/set)
-        const webhookData = {
+      },
+      // Formato para endpoint manager
+      { 
+        url: `${EVO_API_URL}/manager/instance/${exactInstanceName}/dify`,
+        method: 'POST',
+        body: {
+          url: difyApiUrl,
+          apiKey: config.apiKey,
+          enabled: true
+        }
+      },
+      // Formato para webhook especifico
+      { 
+        url: `${EVO_API_URL}/instance/webhook/set`,
+        method: 'POST',
+        body: {
           instanceName: exactInstanceName,
           url: difyApiUrl,
           type: "dify",
           apiKey: config.apiKey,
           enabled: true
-        };
-        
-        console.log("Registrando webhook com dados:", webhookData);
-        
-        const response = await fetch(`${EVO_API_URL}/instance/webhook/set`, {
-          method: 'POST',
-          headers: {
-            'apikey': EVO_API_KEY,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(webhookData)
-        });
-        
-        if (response.ok) {
-          console.log("Webhook registrado com sucesso usando endpoint moderno");
-          const data = await response.json();
-          console.log("Resposta:", data);
-          
-          // Salvar configuração localmente
-          saveDifyConfig(baseName, config);
-          return true;
-        } else {
-          const errorText = await response.text();
-          console.error(`Erro no registro do webhook: ${response.status} - ${errorText}`);
-          throw new Error(`Erro ao registrar webhook: ${response.status}`);
         }
-      }
-    } catch (error) {
-      console.log("Continuando com métodos alternativos...");
-    }
-    
-    // Tentar interface específica para Dify
-    try {
-      const difyCheck = await fetch(`${EVO_API_URL}/instance/dify/${exactInstanceName}`, {
-        method: 'GET',
-        headers: {
-          'apikey': EVO_API_KEY,
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      if (difyCheck.ok || difyCheck.status === 404) {  // 404 é aceitável se ainda não existir configuração
-        console.log("Detectado suporte à interface específica para Dify");
-        
-        const difyData = {
-          difyUrl: difyApiUrl,
-          difyApiKey: config.apiKey,
+      },
+      // Formato para webhook genérico
+      { 
+        url: `${EVO_API_URL}/instance/webhook/${exactInstanceName}`,
+        method: 'POST',
+        body: {
+          url: difyApiUrl,
+          type: "dify",
+          apiKey: config.apiKey,
           enabled: true
-        };
-        
-        console.log("Registrando com interface específica para Dify:", difyData);
-        
-        const response = await fetch(`${EVO_API_URL}/instance/dify/${exactInstanceName}`, {
-          method: 'POST',
-          headers: {
-            'apikey': EVO_API_KEY,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(difyData)
-        });
-        
-        if (response.ok) {
-          console.log("Integração Dify registrada com sucesso usando endpoint específico");
-          const data = await response.json();
-          console.log("Resposta:", data);
-          
-          // Salvar configuração localmente
-          saveDifyConfig(baseName, config);
-          return true;
         }
       }
-    } catch (error) {
-      console.log("Interface específica para Dify não disponível, tentando método alternativo...");
-    }
+    ];
     
-    // Tentar endpoint direto de configurações
+    // Tentativa adicional com endpoint no formato da Evolution v2
+    endpointFormats.push({
+      url: `${EVO_API_URL}/webhook/set`,
+      method: 'POST',
+      body: {
+        instance: exactInstanceName,
+        webhook: {
+          url: difyApiUrl,
+          apiKey: config.apiKey
+        },
+        events: ["all"],
+        enabled: true,
+        type: "dify"
+      }
+    });
+    
+    // Formato para configuração direta nas settings
+    let settingsEndpoint = null;
     try {
-      console.log("Tentando através das configurações gerais da instância...");
-      
-      // Obter configurações atuais da instância
+      // Obter configurações atuais primeiro
       const settingsResponse = await fetch(`${EVO_API_URL}/instance/settings/${exactInstanceName}`, {
         method: 'GET',
         headers: {
@@ -377,90 +340,170 @@ export const registerDifyBot = async (
       
       if (settingsResponse.ok) {
         const currentSettings = await settingsResponse.json();
-        console.log("Configurações atuais:", currentSettings);
-        
-        // Atualizar configurações com webhook do Dify
-        const updatedSettings = {
-          ...currentSettings,
-          webhook: {
-            ...currentSettings?.webhook,
-            dify: {
-              url: difyApiUrl,
-              apiKey: config.apiKey,
-              enabled: true
+        settingsEndpoint = {
+          url: `${EVO_API_URL}/instance/settings/${exactInstanceName}`,
+          method: 'POST',
+          body: {
+            ...currentSettings,
+            webhook: {
+              ...currentSettings?.webhook,
+              dify: {
+                url: difyApiUrl,
+                apiKey: config.apiKey,
+                enabled: true
+              }
             }
           }
         };
+        endpointFormats.push(settingsEndpoint);
+      }
+    } catch (error) {
+      console.log("Não foi possível obter configurações atuais para atualização");
+    }
+    
+    // Tentar cada formato de endpoint até que um funcione
+    console.log(`Tentando ${endpointFormats.length} formatos de endpoint diferentes...`);
+    
+    let successfulEndpoint = null;
+    for (const [index, endpoint] of endpointFormats.entries()) {
+      try {
+        console.log(`[${index + 1}/${endpointFormats.length}] Tentando endpoint: ${endpoint.url}`);
+        const response = await fetch(endpoint.url, {
+          method: endpoint.method,
+          headers: {
+            'apikey': EVO_API_KEY,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(endpoint.body)
+        });
         
-        console.log("Atualizando configurações da instância:", updatedSettings);
+        const responseText = await response.text();
+        let data;
+        try {
+          data = JSON.parse(responseText);
+        } catch (e) {
+          data = responseText;
+        }
         
-        const updateResponse = await fetch(`${EVO_API_URL}/instance/settings/${exactInstanceName}`, {
+        if (response.ok || response.status === 200 || response.status === 201) {
+          console.log(`Sucesso com endpoint ${index + 1}:`, data);
+          successfulEndpoint = endpoint;
+          break;
+        } else {
+          console.log(`Falha no endpoint ${index + 1} (${response.status}):`, data);
+        }
+      } catch (error) {
+        console.error(`Erro ao tentar endpoint ${index + 1}:`, error);
+      }
+    }
+    
+    // Tentar método especial para o formato da Evolution API v2 Manager
+    if (!successfulEndpoint) {
+      try {
+        console.log(`Tentando endpoint do manager v2 específico com botões de configuração...`);
+        const managerEndpoint = `${EVO_API_URL}/manager/bots/add`;
+        const response = await fetch(managerEndpoint, {
           method: 'POST',
           headers: {
             'apikey': EVO_API_KEY,
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify(updatedSettings)
+          body: JSON.stringify({
+            instance: exactInstanceName,
+            botType: "dify",
+            configuration: {
+              apiUrl: difyApiUrl,
+              apiKey: config.apiKey,
+              enabled: true
+            }
+          })
         });
         
-        if (updateResponse.ok) {
-          console.log("Configurações atualizadas com sucesso");
-          const data = await updateResponse.json();
-          console.log("Resposta:", data);
-          
-          // Salvar configuração localmente
-          saveDifyConfig(baseName, config);
-          return true;
+        if (response.ok) {
+          console.log("Sucesso com endpoint manager v2!");
+          successfulEndpoint = { url: managerEndpoint, method: 'POST', body: {} };
+        } else {
+          const data = await response.text();
+          console.log(`Falha no endpoint manager v2 (${response.status}):`, data);
         }
+      } catch (error) {
+        console.error("Erro ao tentar endpoint manager v2:", error);
       }
-    } catch (error) {
-      console.log("Método de configurações gerais falhou, tentando último recurso...");
     }
     
-    // Tentar através do endpoint de manager
-    try {
-      console.log("Tentando através do endpoint do manager...");
-      
-      // Verificar se o endpoint do manager está acessível
-      const managerUrl = `${EVO_API_URL}/manager/instance/${exactInstanceName}/dify`;
-      console.log(`Verificando endpoint do manager: ${managerUrl}`);
-      
-      const managerResponse = await fetch(managerUrl, {
-        method: 'POST',
-        headers: {
-          'apikey': EVO_API_KEY,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          url: difyApiUrl,
-          apiKey: config.apiKey,
-          enabled: true
-        })
-      });
-      
-      if (managerResponse.ok) {
-        console.log("Webhook registrado com sucesso através do manager");
-        const data = await managerResponse.json();
-        console.log("Resposta:", data);
-        
-        // Salvar configuração localmente
-        saveDifyConfig(baseName, config);
-        return true;
-      }
-    } catch (error) {
-      console.log("Todos os métodos falharam para registro automático do webhook");
-    }
-    
-    // Se chegamos aqui, todas as tentativas falharam mas vamos salvar a configuração mesmo assim
-    console.log("Salvando configuração localmente para uso do aplicativo");
+    // Salvar configuração local em todos os casos
     saveDifyConfig(baseName, config);
     
-    // Informar que a configuração foi salva, mas é necessário registro manual
-    throw new Error("Configuração local salva, mas é necessário configurar o webhook manualmente na Evolution API");
+    // Se nenhum endpoint funcionou, mesmo assim retornar para modo manual
+    if (!successfulEndpoint) {
+      console.log("Nenhum endpoint funcionou, mas config local foi salva.");
+      throw new Error("Configuração local salva. Webhook não pôde ser registrado automaticamente.");
+    }
     
+    return true;
   } catch (error: any) {
     console.error("Erro no processo de registro do bot Dify:", error);
     throw error;
+  }
+};
+
+// Função adicional para verificar webhooks existentes e suas configurações
+export const checkExistingWebhooks = async (instanceName: string): Promise<any[]> => {
+  const EVO_API_KEY = "29MoyRfK6RM0CWCOXnReOpAj6dIYTt3z";
+  const EVO_API_URL = "https://v2.solucoesweb.uk";
+  
+  try {
+    // Normalizar o nome da instância
+    const baseName = instanceName.replace("_Cliente", "");
+    const instanceWithSuffix = `${baseName}_Cliente`;
+    
+    // Tentar diferentes endpoints para listar webhooks
+    const endpoints = [
+      `${EVO_API_URL}/instance/webhook/list/${instanceWithSuffix}`,
+      `${EVO_API_URL}/instance/webhook/list`,
+      `${EVO_API_URL}/webhook/list/${instanceWithSuffix}`,
+      `${EVO_API_URL}/manager/instance/${instanceWithSuffix}/webhooks`
+    ];
+    
+    for (const endpoint of endpoints) {
+      try {
+        const response = await fetch(endpoint, {
+          method: 'GET',
+          headers: {
+            'apikey': EVO_API_KEY
+          }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          console.log(`Webhooks encontrados via ${endpoint}:`, data);
+          
+          // Filtrar apenas webhooks do tipo dify se for uma lista
+          if (Array.isArray(data)) {
+            const difyWebhooks = data.filter(webhook => 
+              webhook.type === 'dify' || 
+              webhook.name === 'dify' || 
+              webhook.webhook_type === 'dify'
+            );
+            return difyWebhooks;
+          } else if (data.webhooks && Array.isArray(data.webhooks)) {
+            return data.webhooks.filter(webhook => 
+              webhook.type === 'dify' || 
+              webhook.name === 'dify' || 
+              webhook.webhook_type === 'dify'
+            );
+          }
+          return data;
+        }
+      } catch (err) {
+        console.log(`Erro ao tentar endpoint ${endpoint}:`, err);
+      }
+    }
+    
+    return [];
+  } catch (error) {
+    console.error("Erro ao verificar webhooks existentes:", error);
+    return [];
   }
 };
 

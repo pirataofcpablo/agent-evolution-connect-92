@@ -11,13 +11,14 @@ import {
   getDifyConfig, 
   testDifyConnection, 
   registerDifyBot, 
-  checkInstanceStatus 
+  checkInstanceStatus,
+  checkExistingWebhooks
 } from '@/services/difyService';
 import { 
   getInstanceDetails, 
   fetchAllInstances 
 } from '@/services/evoService';
-import { Loader2, Bot, CheckCircle, AlertCircle, InfoIcon, RefreshCw, ExternalLink, Copy } from "lucide-react";
+import { Loader2, Bot, CheckCircle, AlertCircle, InfoIcon, RefreshCw, ExternalLink, Copy, RotateCw } from "lucide-react";
 
 interface DifyIntegrationProps {
   instanceName: string;
@@ -39,6 +40,9 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
   const [refreshingStatus, setRefreshingStatus] = useState(false);
   const [manualWebhookMode, setManualWebhookMode] = useState(false);
   const [copySuccess, setCopySuccess] = useState<string | null>(null);
+  const [integrationAttempts, setIntegrationAttempts] = useState(0);
+  const [existingWebhooks, setExistingWebhooks] = useState<any[]>([]);
+  const [processingStatus, setProcessingStatus] = useState<string | null>(null);
   
   // Função para copiar dados para a área de transferência com feedback
   const copyToClipboard = (text: string, label: string) => {
@@ -61,6 +65,28 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
           variant: "destructive",
         });
       });
+  };
+  
+  // Verificar webhooks existentes
+  const checkWebhooks = async () => {
+    if (!instanceName) return;
+    
+    try {
+      const webhooks = await checkExistingWebhooks(instanceName);
+      console.log("Webhooks encontrados:", webhooks);
+      setExistingWebhooks(webhooks || []);
+      
+      // Se encontrou webhooks do tipo dify, considerar integração completa
+      if (webhooks && webhooks.length > 0) {
+        console.log("Webhook Dify já configurado!");
+        setIntegrationComplete(true);
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error("Erro ao verificar webhooks:", error);
+      return false;
+    }
   };
   
   // Nova função para verificar status da instância de forma mais robusta
@@ -97,6 +123,9 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
           exists: true,
           connected: connected
         });
+        
+        // Verificar webhooks existentes
+        await checkWebhooks();
         
         if (connected) {
           console.log(`Instância ${details.instanceName || details.name} está conectada!`);
@@ -136,6 +165,9 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
             connected: connected
           });
           
+          // Verificar webhooks existentes
+          await checkWebhooks();
+          
           if (!connected) {
             setRegistrationError(`A instância ${matchedInstance.instanceName || matchedInstance.name} existe, mas não está conectada (status: ${status}). Verifique na aba Conectar.`);
           }
@@ -149,6 +181,9 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
             setRegistrationError(`A instância ${instanceName} não foi encontrada. Verifique se você criou e conectou corretamente.`);
           } else if (!status.connected) {
             setRegistrationError(`A instância ${instanceName} existe, mas não está conectada. Volte à aba Conectar e escaneie o QR Code.`);
+          } else {
+            // Verificar webhooks existentes
+            await checkWebhooks();
           }
         }
       }
@@ -186,8 +221,21 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
           setApiUrl(savedConfig.apiUrl);
           setApplicationId(savedConfig.applicationId);
           setModelType(savedConfig.modelType);
-          setIntegrationComplete(true);
-          setConnectionSuccess(true);
+          
+          // Verificar se tem uma integração válida
+          const hasValidWebhook = checkWebhooks();
+          
+          if (hasValidWebhook) {
+            setIntegrationComplete(true);
+            setConnectionSuccess(true);
+          } else {
+            // Se tem configuração mas não tem webhook, permitir reintegração
+            setIntegrationComplete(false);
+            // Testar conexão
+            testDifyConnection(savedConfig).then(success => {
+              setConnectionSuccess(success);
+            });
+          }
         }
       } catch (error) {
         console.error("Erro ao carregar configuração Dify:", error);
@@ -261,6 +309,8 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
 
     setIsLoading(true);
     setRegistrationError(null);
+    setProcessingStatus("Iniciando processo de integração...");
+    setIntegrationAttempts(prev => prev + 1);
     
     try {
       if (!instanceName) {
@@ -268,6 +318,7 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
       }
       
       // Verificar status da instância antes de prosseguir
+      setProcessingStatus("Verificando status da instância...");
       const status = await checkInstanceStatus(instanceName);
       if (!status.exists) {
         throw new Error(`Instância ${instanceName} não encontrada. Verifique se você criou a instância corretamente.`);
@@ -289,6 +340,7 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
       };
       
       // Testar conexão antes de prosseguir
+      setProcessingStatus("Testando conexão com Dify...");
       console.log("Testando conexão com Dify antes da integração...");
       const isConnected = await testDifyConnection(config);
       
@@ -298,7 +350,25 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
       
       console.log("Conexão com Dify estabelecida com sucesso.");
       
+      // Verificar webhooks existentes
+      setProcessingStatus("Verificando webhooks existentes...");
+      const hasExistingWebhook = await checkWebhooks();
+      
+      if (hasExistingWebhook) {
+        console.log("Webhook já configurado, atualizando configuração local");
+        saveDifyConfig(instanceName.replace("_Cliente", ""), config);
+        setIntegrationComplete(true);
+        
+        toast({
+          title: "Integração atualizada",
+          description: "O webhook já estava configurado. Configuração local atualizada.",
+        });
+        
+        return;
+      }
+      
       // Registrar o bot Dify na Evolution API
+      setProcessingStatus("Registrando webhook na Evolution API...");
       console.log(`Registrando bot Dify para a instância: ${instanceName}`);
       
       try {
@@ -309,6 +379,9 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
           title: "Integração realizada",
           description: "O bot Dify foi integrado com sucesso à instância " + instanceName,
         });
+        
+        // Verificar se o webhook foi realmente registrado
+        await checkWebhooks();
       } catch (webhookError: any) {
         console.error("Erro específico no registro do webhook:", webhookError);
         
@@ -324,11 +397,9 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
         // Consideramos parcialmente configurado
         setIntegrationComplete(true);
         
-        // Change from "warning" to "default" with customized styling if needed
         toast({
           title: "Integração parcial",
           description: "Configuração salva localmente, mas houve um problema no registro do webhook.",
-          // Fix: Change "warning" to "default" since "warning" is not a supported variant
           variant: "default",
         });
       }
@@ -342,6 +413,7 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
       });
     } finally {
       setIsLoading(false);
+      setProcessingStatus(null);
     }
   };
 
@@ -437,6 +509,22 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
         </div>
       )}
 
+      {/* Informações de webhook existente */}
+      {existingWebhooks.length > 0 && (
+        <div className="p-3 bg-green-900/20 border border-green-700/30 rounded-md mb-4">
+          <h4 className="text-sm font-medium text-green-300 mb-2">
+            <span className="flex items-center">
+              <CheckCircle className="h-4 w-4 mr-2" />
+              Webhook Dify já configurado
+            </span>
+          </h4>
+          <div className="text-sm text-gray-300">
+            Esta instância já possui um webhook para o Dify configurado. 
+            Qualquer alteração nas configurações será apenas local.
+          </div>
+        </div>
+      )}
+
       {/* Mostrar informações adicionais quando houver problemas de webhook */}
       {manualWebhookMode && (
         <Alert className="bg-yellow-900/20 border-yellow-500/30 mb-4">
@@ -503,7 +591,7 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
               <p className="font-semibold">Configuração manual na Evolution API:</p>
               <ol className="list-decimal list-inside ml-2 mt-1 space-y-1">
                 <li>Acesse o painel da Evolution API</li>
-                <li>Vá para Configurações {'>'} Webhooks</li>
+                <li>Vá para Configurações {'>'} Webhooks ou Bots</li>
                 <li>Adicione um novo webhook do tipo "Dify IA"</li>
                 <li>Use a mesma API Key e URL configuradas aqui</li>
                 <li>Ative o webhook para a instância {instanceName}</li>
@@ -542,6 +630,14 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
             {registrationError}
           </AlertDescription>
         </Alert>
+      )}
+
+      {/* Exibir o status de processamento quando estiver carregando */}
+      {isLoading && processingStatus && (
+        <div className="p-3 bg-blue-900/20 rounded-md flex items-center">
+          <RotateCw className="h-5 w-5 animate-spin text-blue-500 mr-2" />
+          <span className="text-blue-300">{processingStatus}</span>
+        </div>
       )}
 
       <form onSubmit={handleSaveIntegration} className="space-y-4">
@@ -658,14 +754,14 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
           </Button>
           <Button 
             type="submit" 
-            disabled={isLoading || (integrationComplete && !manualWebhookMode) || !connectionSuccess || 
-                     (instanceStatus && (!instanceStatus.exists || !instanceStatus.connected))}
+            disabled={isLoading || (integrationComplete && !manualWebhookMode && existingWebhooks.length > 0) || 
+                     !connectionSuccess || (instanceStatus && (!instanceStatus.exists || !instanceStatus.connected))}
             className="bg-blue-600 hover:bg-blue-700"
           >
             {isLoading ? (
               <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Integrando...</>
             ) : integrationComplete && !manualWebhookMode ? (
-              <><Bot className="mr-2 h-4 w-4" /> Integração Completa</>
+              <>{existingWebhooks.length > 0 ? <Bot className="mr-2 h-4 w-4" /> : <RotateCw className="mr-2 h-4 w-4" />} {existingWebhooks.length > 0 ? "Integração Completa" : "Tentar novamente"}</>
             ) : (
               <><Bot className="mr-2 h-4 w-4" /> Integrar com Dify IA</>
             )}
