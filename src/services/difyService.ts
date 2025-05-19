@@ -1,3 +1,4 @@
+// API Evo service for WhatsApp connection
 
 interface DifyConfig {
   apiKey: string;
@@ -81,6 +82,97 @@ export const testDifyConnection = async (config: DifyConfig): Promise<boolean> =
   }
 };
 
+// Função para verificar o status atual da instância através da API Evolution
+export const checkInstanceStatus = async (instanceName: string): Promise<{exists: boolean, connected: boolean}> => {
+  const EVO_API_KEY = "29MoyRfK6RM0CWCOXnReOpAj6dIYTt3z";
+  const EVO_API_URL = "https://v2.solucoesweb.uk";
+  
+  try {
+    console.log(`Verificando status da instância: ${instanceName}`);
+    
+    // Primeiro tentar obter detalhes diretos da instância se disponível
+    const normalizedName = instanceName.replace("_Cliente", "");
+    const fullName = normalizedName + "_Cliente";
+    
+    console.log(`Tentando verificação direta para: ${fullName} e ${normalizedName}`);
+    
+    try {
+      // Usar a nova função getInstanceDetails para verificação direta
+      const instanceDetails = await getInstanceDetails(instanceName);
+      
+      if (instanceDetails) {
+        console.log(`Instância encontrada diretamente: ${instanceDetails.instanceName}`);
+        const status = instanceDetails.status || instanceDetails.connectionStatus || "Unknown";
+        
+        const isConnected = 
+          status === "CONNECTED" || 
+          status === "ONLINE" || 
+          status === "On" ||
+          status === "Connected" ||
+          status === "open";
+        
+        return {
+          exists: true,
+          connected: isConnected
+        };
+      }
+    } catch (directError) {
+      console.log("Verificação direta falhou, tentando método alternativo");
+    }
+    
+    // Se o método direto falhar, tentar com a lista de instâncias
+    const instances = await fetchAllInstances();
+    console.log(`Instâncias encontradas: ${instances?.length || 0}`);
+    
+    if (Array.isArray(instances)) {
+      // Verificar possíveis formatos de nome
+      const possibleNames = [
+        instanceName,
+        fullName,
+        normalizedName,
+        instanceName.toLowerCase(),
+        fullName.toLowerCase(),
+        normalizedName.toLowerCase()
+      ];
+      
+      // Procurar correspondência na lista de instâncias
+      for (const instance of instances) {
+        if (!instance.instanceName) continue;
+        
+        const currentName = instance.instanceName.toLowerCase();
+        
+        // Verificar correspondências
+        for (const name of possibleNames) {
+          if (currentName === name.toLowerCase() || 
+              currentName.includes(normalizedName.toLowerCase())) {
+            
+            console.log(`Instância encontrada: ${instance.instanceName} com status: ${instance.status || 'N/A'}`);
+            
+            const status = instance.status || instance.connectionStatus || "Unknown";
+            const isConnected = 
+              status === "CONNECTED" || 
+              status === "ONLINE" || 
+              status === "On" ||
+              status === "Connected" ||
+              status === "open";
+            
+            return {
+              exists: true,
+              connected: isConnected
+            };
+          }
+        }
+      }
+    }
+    
+    console.log("Nenhuma instância encontrada com o nome fornecido");
+    return {exists: false, connected: false};
+  } catch (error) {
+    console.error("Erro ao verificar status da instância:", error);
+    return {exists: false, connected: false};
+  }
+};
+
 // Função de envio de mensagem atualizada
 export const sendMessageToDify = async (
   message: string, 
@@ -132,85 +224,7 @@ export const sendMessageToDify = async (
   }
 };
 
-// Função para verificar o status atual da instância através da API Evolution
-export const checkInstanceStatus = async (instanceName: string): Promise<{exists: boolean, connected: boolean}> => {
-  const EVO_API_KEY = "29MoyRfK6RM0CWCOXnReOpAj6dIYTt3z";
-  const EVO_API_URL = "https://v2.solucoesweb.uk";
-  
-  try {
-    console.log(`Verificando status da instância: ${instanceName}`);
-    
-    // Verificar variações de nome (com e sem _Cliente)
-    const possibleNames = [
-      instanceName,
-      instanceName.endsWith("_Cliente") ? instanceName : `${instanceName}_Cliente`,
-      instanceName.replace("_Cliente", "")
-    ];
-    
-    console.log(`Nomes possíveis para busca: ${possibleNames.join(", ")}`);
-    
-    // Obter lista de instâncias
-    const fetchInstancesResponse = await fetch(`${EVO_API_URL}/instance/fetchInstances`, {
-      method: 'GET',
-      headers: {
-        'apikey': EVO_API_KEY,
-        'Content-Type': 'application/json'
-      }
-    });
-    
-    if (!fetchInstancesResponse.ok) {
-      throw new Error(`Erro ao buscar instâncias: ${fetchInstancesResponse.status}`);
-    }
-    
-    const instances = await fetchInstancesResponse.json();
-    console.log(`Instâncias encontradas: ${instances?.length || 0}`);
-    
-    // Debug - listar todas as instâncias
-    if (Array.isArray(instances)) {
-      console.log("Lista de instâncias disponíveis:");
-      instances.forEach((inst: any, index: number) => {
-        console.log(`${index + 1}. ${inst.instanceName} (status: ${inst.status || 'N/A'})`);
-      });
-    }
-    
-    // Verificar se algum dos possíveis nomes existe nas instâncias
-    let foundInstance = null;
-    let foundName = "";
-    
-    if (Array.isArray(instances)) {
-      for (const name of possibleNames) {
-        foundInstance = instances.find((instance: any) => 
-          instance.instanceName?.toLowerCase() === name.toLowerCase());
-        
-        if (foundInstance) {
-          foundName = name;
-          console.log(`Instância encontrada como: ${foundName} (status: ${foundInstance.status || 'N/A'})`);
-          break;
-        }
-      }
-    }
-    
-    if (!foundInstance) {
-      console.log("Nenhuma instância encontrada com os nomes testados");
-      return {exists: false, connected: false};
-    }
-    
-    const isConnected = foundInstance.status === "CONNECTED" || 
-                       foundInstance.status === "ONLINE" || 
-                       foundInstance.status === "On";
-    
-    return {
-      exists: true,
-      connected: isConnected
-    };
-    
-  } catch (error) {
-    console.error("Erro ao verificar status da instância:", error);
-    return {exists: false, connected: false};
-  }
-};
-
-// Função de registro de bot Dify completamente revisada
+// Função de registro de bot Dify revisada para melhor compatibilidade com a API Evolution
 export const registerDifyBot = async (
   instanceName: string, 
   config: DifyConfig
@@ -219,31 +233,26 @@ export const registerDifyBot = async (
   const EVO_API_URL = "https://v2.solucoesweb.uk";
   
   try {
-    // Normalizar nomes de instância para diferentes casos
-    const baseInstanceName = instanceName.replace("_Cliente", "");
-    const instanceWithSuffix = `${baseInstanceName}_Cliente`;
+    // Normalizar o nome da instância para diferentes possibilidades
+    const baseName = instanceName.replace("_Cliente", "");
+    const instanceWithSuffix = `${baseName}_Cliente`;
     
-    console.log(`Iniciando registro do bot Dify para a instância base: ${baseInstanceName}`);
-    console.log(`Também verificando com sufixo: ${instanceWithSuffix}`);
+    console.log(`Iniciando registro do bot Dify para a instância: ${instanceName}`);
+    console.log(`Nome base: ${baseName}, Nome com sufixo: ${instanceWithSuffix}`);
     
-    // Verificar se a instância existe e está conectada
-    const instanceStatus = await checkInstanceStatus(instanceName);
+    // Obter detalhes diretos da instância para garantir que está conectada
+    const instanceDetails = await getInstanceDetails(instanceName);
     
-    if (!instanceStatus.exists) {
-      console.error(`Instância não encontrada: ${instanceName}`);
-      throw new Error(`Instância ${instanceName} não encontrada. Verifique se o nome está correto e se ela está criada no sistema.`);
+    if (!instanceDetails) {
+      throw new Error(`Não foi possível encontrar detalhes da instância ${instanceName}. Verifique se o nome está correto.`);
     }
     
-    if (!instanceStatus.connected) {
-      console.error(`Instância encontrada, mas não está conectada: ${instanceName}`);
-      throw new Error(`A instância ${instanceName} existe, mas não está conectada. Conecte-a primeiro antes de integrar o bot Dify.`);
-    }
-    
-    console.log(`Instância verificada e conectada. Prosseguindo com integração Dify.`);
+    console.log(`Detalhes da instância encontrados: ${JSON.stringify(instanceDetails)}`);
     
     // Determinar qual nome usar para a integração (com ou sem sufixo)
-    // Primeiro tentamos com o nome exato como fornecido
-    let finalInstanceName = instanceName;
+    // Usar o nome exato como retornado pela API
+    const finalInstanceName = instanceDetails.instanceName || instanceWithSuffix;
+    console.log(`Nome final para integração: ${finalInstanceName}`);
     
     // Formatar corretamente a URL da API Dify para a integração
     let difyApiUrl = config.apiUrl;
@@ -276,6 +285,7 @@ export const registerDifyBot = async (
     console.log(`Status da resposta: ${integrationResponse.status}`);
     
     if (!integrationResponse.ok) {
+      // Tentar determinar o erro
       let errorText = "";
       try {
         errorText = await integrationResponse.text();
@@ -283,11 +293,11 @@ export const registerDifyBot = async (
         errorText = "Não foi possível ler o erro";
       }
       
-      // Se a primeira tentativa falhar com erro 404, tentar com o nome alternativo
-      if (integrationResponse.status === 404 && finalInstanceName !== instanceWithSuffix) {
-        console.log(`Tentativa falhou. Tentando novamente com nome alternativo: ${instanceWithSuffix}`);
+      // Tentar com nome alternativo se o primeiro falhar
+      if (integrationResponse.status === 404 || errorText.includes("not found")) {
+        console.log(`Tentativa falhou. Tentando com nome alternativo: ${baseName}`);
         
-        const alternativeUrl = `${EVO_API_URL}/webhook/dify/${instanceWithSuffix}`;
+        const alternativeUrl = `${EVO_API_URL}/webhook/dify/${baseName}`;
         console.log(`URL alternativa: ${alternativeUrl}`);
         
         const alternativeResponse = await fetch(alternativeUrl, {
@@ -300,16 +310,48 @@ export const registerDifyBot = async (
         });
         
         if (!alternativeResponse.ok) {
+          // Se ainda falhar, tentar uma terceira variante
+          console.log(`Segunda tentativa falhou. Tentando com terceira variante.`);
+          
+          // Tentar com o nome exato como está no localStorage
+          const storedName = localStorage.getItem('instanceName');
+          if (storedName) {
+            const thirdUrl = `${EVO_API_URL}/webhook/dify/${storedName}`;
+            console.log(`URL da terceira tentativa: ${thirdUrl}`);
+            
+            const thirdResponse = await fetch(thirdUrl, {
+              method: 'POST',
+              headers: {
+                'apikey': EVO_API_KEY,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify(requestBody)
+            });
+            
+            if (!thirdResponse.ok) {
+              const thirdErrorText = await thirdResponse.text();
+              console.error(`Erro na terceira tentativa (${thirdResponse.status}):`, thirdErrorText);
+              throw new Error(`Falha em todas as tentativas de registro do bot Dify. Último erro: ${thirdErrorText}`);
+            }
+            
+            const thirdResponseData = await thirdResponse.json();
+            console.log("Resposta da integração Dify (terceira tentativa):", thirdResponseData);
+            
+            // Salvar configuração
+            saveDifyConfig(baseName, config);
+            return true;
+          }
+          
           const altErrorText = await alternativeResponse.text();
           console.error(`Erro na segunda tentativa (${alternativeResponse.status}):`, altErrorText);
-          throw new Error(`Falha nas duas tentativas de registro do bot Dify: ${altErrorText}`);
+          throw new Error(`Falha nas tentativas de registro do bot Dify. Erro: ${altErrorText}`);
         }
         
         const altResponseData = await alternativeResponse.json();
         console.log("Resposta da integração Dify (segunda tentativa):", altResponseData);
         
-        // Salvar com o nome base (sem sufixo) para manter consistência
-        saveDifyConfig(baseInstanceName, config);
+        // Salvar configuração
+        saveDifyConfig(baseName, config);
         return true;
       }
       
@@ -321,13 +363,16 @@ export const registerDifyBot = async (
     const responseData = await integrationResponse.json();
     console.log("Resposta da integração Dify:", responseData);
     
-    // Salvar configuração localmente com o nome base
-    saveDifyConfig(baseInstanceName, config);
+    // Salvar configuração localmente
+    saveDifyConfig(baseName, config);
     
-    console.log(`Bot Dify registrado com sucesso para ${baseInstanceName}`);
+    console.log(`Bot Dify registrado com sucesso para ${baseName}`);
     return true;
   } catch (error: any) {
     console.error("Erro ao registrar chatbot Dify:", error);
     throw error;
   }
 };
+
+// Importe as funções adicionais do evoService
+import { fetchAllInstances, getInstanceDetails } from '../services/evoService';

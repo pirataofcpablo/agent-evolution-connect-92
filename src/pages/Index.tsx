@@ -10,7 +10,7 @@ import BotStatus from "@/components/BotStatus";
 import { toast } from "@/components/ui/use-toast";
 import { getDifyConfig } from '@/services/difyService';
 import { getN8nConfig } from '@/services/n8nService';
-import { verifyConnectedInstance } from '@/services/evoService';
+import { verifyConnectedInstance, fetchAllInstances, getInstanceDetails } from '@/services/evoService';
 
 const Index = () => {
   const [instanceConnected, setInstanceConnected] = useState(false);
@@ -25,8 +25,21 @@ const Index = () => {
     const checkInstances = async () => {
       setLoading(true);
       try {
-        // Verificar diretamente na API Evolution se há instâncias conectadas
         console.log("Verificando instâncias conectadas na API Evolution...");
+        
+        // Verificar diretamente na API Evolution se há instâncias disponíveis
+        const instances = await fetchAllInstances();
+        console.log(`Encontradas ${instances.length} instâncias na API`);
+        
+        // Exibir todas instâncias para debug
+        if (Array.isArray(instances) && instances.length > 0) {
+          console.log("Todas instâncias disponíveis:");
+          instances.forEach((inst, idx) => {
+            console.log(`${idx + 1}. Nome: ${inst.instanceName || inst.name || 'N/A'} | Status: ${inst.status || inst.connectionStatus || 'N/A'}`);
+          });
+        }
+        
+        // Verificar se alguma instância está conectada
         const { instanceName: connectedName, status } = await verifyConnectedInstance();
         
         if (connectedName) {
@@ -40,6 +53,12 @@ const Index = () => {
           // Atualizar localStorage com dados verificados
           localStorage.setItem('instanceName', `${baseInstanceName}_Cliente`);
           localStorage.setItem('instanceStatus', status || 'Connected');
+          
+          // Buscar detalhes adicionais da instância
+          const instanceDetails = await getInstanceDetails(`${baseInstanceName}_Cliente`);
+          if (instanceDetails) {
+            console.log("Detalhes completos da instância:", instanceDetails);
+          }
           
           // Check if there are Dify and n8n configurations
           try {
@@ -70,9 +89,15 @@ const Index = () => {
             } else {
               // Se encontrou instância mas não tem configurações, ir para a aba de bots
               setActiveTab("bots");
+              
+              toast({
+                title: "Instância Conectada",
+                description: `Instância ${baseInstanceName} está conectada. Configure os bots agora.`,
+              });
             }
           } catch (error) {
             console.error("Erro ao verificar configurações:", error);
+            setActiveTab("bots");
           }
         } else {
           console.log("Nenhuma instância conectada encontrada na API.");
@@ -115,6 +140,8 @@ const Index = () => {
           // Ir para aba de integração se tiver instância mas não tiver configurações
           if (!difyConfig && !n8nConfig) {
             setActiveTab("bots");
+          } else {
+            setActiveTab("status");
           }
         } else {
           console.log("Nenhuma instância conectada no localStorage");

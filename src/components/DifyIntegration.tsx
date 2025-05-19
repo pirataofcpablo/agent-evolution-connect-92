@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { toast } from "@/components/ui/use-toast";
 import { Input } from "@/components/ui/input";
@@ -6,8 +5,18 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { saveDifyConfig, getDifyConfig, testDifyConnection, registerDifyBot, checkInstanceStatus } from '@/services/difyService';
-import { Loader2, Bot, CheckCircle, AlertCircle, InfoIcon } from "lucide-react";
+import { 
+  saveDifyConfig, 
+  getDifyConfig, 
+  testDifyConnection, 
+  registerDifyBot, 
+  checkInstanceStatus 
+} from '@/services/difyService';
+import { 
+  getInstanceDetails, 
+  fetchAllInstances 
+} from '@/services/evoService';
+import { Loader2, Bot, CheckCircle, AlertCircle, InfoIcon, RefreshCw } from "lucide-react";
 
 interface DifyIntegrationProps {
   instanceName: string;
@@ -25,58 +34,137 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
   const [registrationError, setRegistrationError] = useState<string | null>(null);
   const [instanceVerifying, setInstanceVerifying] = useState(false);
   const [instanceStatus, setInstanceStatus] = useState<{exists: boolean, connected: boolean} | null>(null);
+  const [instanceDetails, setInstanceDetails] = useState<any>(null);
+  const [refreshingStatus, setRefreshingStatus] = useState(false);
+  
+  // Nova função para verificar status da instância de forma mais robusta
+  const verifyInstanceStatus = async () => {
+    if (!instanceName) return;
+    
+    setInstanceVerifying(true);
+    setRegistrationError(null);
+    
+    try {
+      console.log(`Verificando status da instância: ${instanceName}`);
+      
+      // 1. Primeiro, tentar obter detalhes diretos da instância
+      const details = await getInstanceDetails(instanceName);
+      setInstanceDetails(details);
+      
+      if (details) {
+        console.log(`Detalhes da instância obtidos:`, details);
+        
+        // Verificar status de conexão
+        const status = details.status || details.connectionStatus;
+        const connected = 
+          status === "CONNECTED" || 
+          status === "ONLINE" || 
+          status === "On" ||
+          status === "Connected" ||
+          status === "open";
+        
+        setInstanceStatus({
+          exists: true,
+          connected: connected
+        });
+        
+        if (connected) {
+          console.log(`Instância ${details.instanceName} está conectada!`);
+        } else {
+          setRegistrationError(`A instância ${details.instanceName} existe, mas não está conectada (status: ${status}). Verifique na aba Conectar.`);
+        }
+      } else {
+        // 2. Se não obteve detalhes diretos, tentar buscar na lista de instâncias
+        console.log("Tentando buscar na lista completa de instâncias...");
+        const instances = await fetchAllInstances();
+        
+        // Verificar correspondências na lista
+        const normalizedName = instanceName.replace("_Cliente", "");
+        const fullName = normalizedName + "_Cliente";
+        
+        const matchedInstance = instances.find(inst => {
+          const instName = inst.instanceName || inst.name;
+          if (!instName) return false;
+          
+          return instName.toLowerCase() === instanceName.toLowerCase() ||
+                 instName.toLowerCase() === fullName.toLowerCase() ||
+                 instName.toLowerCase().includes(normalizedName.toLowerCase());
+        });
+        
+        if (matchedInstance) {
+          console.log(`Instância encontrada na lista completa: ${matchedInstance.instanceName}`);
+          setInstanceDetails(matchedInstance);
+          
+          // Verificar status
+          const status = matchedInstance.status || matchedInstance.connectionStatus;
+          const connected = 
+            status === "CONNECTED" || 
+            status === "ONLINE" || 
+            status === "On" ||
+            status === "Connected" ||
+            status === "open";
+            
+          setInstanceStatus({
+            exists: true,
+            connected: connected
+          });
+          
+          if (!connected) {
+            setRegistrationError(`A instância ${matchedInstance.instanceName} existe, mas não está conectada (status: ${status}). Verifique na aba Conectar.`);
+          }
+        } else {
+          // 3. Se ainda não encontrou, usar o checkInstanceStatus como último recurso
+          console.log("Último recurso: checkInstanceStatus");
+          const status = await checkInstanceStatus(instanceName);
+          setInstanceStatus(status);
+          
+          if (!status.exists) {
+            setRegistrationError(`A instância ${instanceName} não foi encontrada. Verifique se você criou e conectou corretamente.`);
+          } else if (!status.connected) {
+            setRegistrationError(`A instância ${instanceName} existe, mas não está conectada. Volte à aba Conectar e escaneie o QR Code.`);
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Erro ao verificar instância:", error);
+      setRegistrationError("Erro ao verificar status da instância. Por favor, tente novamente.");
+    } finally {
+      setInstanceVerifying(false);
+    }
+  };
+  
+  // Botão para atualizar status manualmente
+  const handleRefreshStatus = async () => {
+    setRefreshingStatus(true);
+    try {
+      await verifyInstanceStatus();
+    } finally {
+      setRefreshingStatus(false);
+    }
+  };
   
   // Verificar status da instância quando o componente é montado
   useEffect(() => {
-    const verifyInstance = async () => {
-      if (!instanceName) return;
-      
-      setInstanceVerifying(true);
+    verifyInstanceStatus();
+    
+    // Tentar carregar configuração salva do Dify
+    if (instanceName) {
       try {
-        console.log(`Verificando status da instância: ${instanceName}`);
-        const status = await checkInstanceStatus(instanceName);
-        setInstanceStatus(status);
+        const normalizedName = instanceName.replace("_Cliente", "");
+        const savedConfig = getDifyConfig(normalizedName);
         
-        if (!status.exists) {
-          setRegistrationError(`A instância ${instanceName} não foi encontrada. Verifique se você criou e conectou corretamente.`);
-        } else if (!status.connected) {
-          setRegistrationError(`A instância ${instanceName} existe, mas não está conectada. Volte à aba Conectar e escaneie o QR Code.`);
-        } else {
-          setRegistrationError(null);
-          console.log(`Instância ${instanceName} verificada e está conectada!`);
+        if (savedConfig) {
+          console.log("Configuração Dify encontrada para", normalizedName);
+          setApiKey(savedConfig.apiKey);
+          setApiUrl(savedConfig.apiUrl);
+          setApplicationId(savedConfig.applicationId);
+          setModelType(savedConfig.modelType);
+          setIntegrationComplete(true);
+          setConnectionSuccess(true);
         }
       } catch (error) {
-        console.error("Erro ao verificar instância:", error);
-      } finally {
-        setInstanceVerifying(false);
+        console.error("Erro ao carregar configuração Dify:", error);
       }
-    };
-    
-    verifyInstance();
-  }, [instanceName]);
-  
-  // Carregar configuração se existir
-  useEffect(() => {
-    if (!instanceName) return;
-    
-    try {
-      // Normalizar nome da instância removendo sufixo _Cliente
-      const normalizedName = instanceName.replace("_Cliente", "");
-      
-      const savedConfig = getDifyConfig(normalizedName);
-      if (savedConfig) {
-        console.log("Configuração Dify encontrada para", normalizedName);
-        setApiKey(savedConfig.apiKey);
-        setApiUrl(savedConfig.apiUrl);
-        setApplicationId(savedConfig.applicationId);
-        setModelType(savedConfig.modelType);
-        setIntegrationComplete(true);
-        setConnectionSuccess(true);
-      } else {
-        console.log("Nenhuma configuração Dify encontrada para", normalizedName);
-      }
-    } catch (error) {
-      console.error("Erro ao carregar configuração Dify:", error);
     }
   }, [instanceName]);
 
@@ -220,6 +308,24 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
         </p>
       </div>
 
+      {/* Status e ação de atualização */}
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-medium text-blue-400">Status da Instância</h3>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={handleRefreshStatus}
+          disabled={refreshingStatus || instanceVerifying}
+        >
+          {refreshingStatus ? (
+            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+          ) : (
+            <RefreshCw className="h-4 w-4 mr-2" />
+          )}
+          Atualizar Status
+        </Button>
+      </div>
+
       {/* Verificação de instância */}
       {instanceVerifying ? (
         <div className="flex items-center justify-center p-6">
@@ -233,7 +339,7 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
               <CheckCircle className="h-5 w-5 text-green-400" />
               <AlertTitle className="text-green-400">Instância Verificada</AlertTitle>
               <AlertDescription className="text-gray-300">
-                A instância {instanceName} está conectada e pronta para integração.
+                A instância {instanceDetails?.instanceName || instanceName} está conectada e pronta para integração.
               </AlertDescription>
             </Alert>
           )}
@@ -243,7 +349,7 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
               <AlertCircle className="h-5 w-5 text-yellow-400" />
               <AlertTitle className="text-yellow-400">Instância Desconectada</AlertTitle>
               <AlertDescription className="text-gray-300">
-                A instância {instanceName} existe, mas não está conectada. Volte à aba Conectar e escaneie o QR Code.
+                A instância {instanceDetails?.instanceName || instanceName} existe, mas não está conectada. Volte à aba Conectar e escaneie o QR Code.
               </AlertDescription>
             </Alert>
           )}
@@ -258,6 +364,21 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
             </Alert>
           )}
         </>
+      )}
+
+      {/* Detalhes de status se disponíveis */}
+      {instanceDetails && (
+        <div className="p-3 bg-gray-800/50 rounded-md mb-4">
+          <h4 className="text-sm font-medium text-gray-300 mb-2">Detalhes da Instância:</h4>
+          <div className="grid grid-cols-2 gap-2 text-sm">
+            <div className="text-gray-400">Nome:</div>
+            <div className="text-blue-400">{instanceDetails.instanceName || instanceDetails.name}</div>
+            <div className="text-gray-400">Status:</div>
+            <div className={`${instanceStatus?.connected ? 'text-green-400' : 'text-yellow-400'}`}>
+              {instanceDetails.status || instanceDetails.connectionStatus || "Desconhecido"}
+            </div>
+          </div>
+        </div>
       )}
 
       {integrationComplete && (
@@ -346,7 +467,9 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
           <div className="p-3 bg-gray-800 rounded-md">
             <div className="flex justify-between">
               <span className="text-gray-300">Instância conectada:</span>
-              <span className="text-blue-400">{instanceName || "Nenhuma"}</span>
+              <span className="text-blue-400">
+                {instanceDetails?.instanceName || instanceName || "Nenhuma"}
+              </span>
             </div>
           </div>
         </div>

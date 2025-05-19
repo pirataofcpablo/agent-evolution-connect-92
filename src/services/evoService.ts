@@ -1,4 +1,3 @@
-
 // API Evo service for WhatsApp connection
 
 const API_KEY = "29MoyRfK6RM0CWCOXnReOpAj6dIYTt3z";
@@ -138,54 +137,50 @@ export const checkInstanceExists = async (instanceName: string): Promise<{exists
     const instances = await fetchAllInstances();
     console.log(`Total de instâncias encontradas: ${instances.length}`);
     
-    // Verificar possíveis formatos do nome (com ou sem sufixo _Cliente)
+    // Mostrar todas as instâncias para debug
+    if (Array.isArray(instances)) {
+      console.log("Lista completa de instâncias da API Evolution:");
+      instances.forEach((inst, idx) => {
+        console.log(`${idx + 1}. Nome: ${inst.instanceName || 'N/A'} | Status: ${inst.status || 'N/A'}`);
+      });
+    }
+    
+    // Normalizar nomes para diferentes formatos possíveis
+    const baseName = instanceName.replace('_Cliente', '');
+    const fullName = baseName + '_Cliente';
+    
+    // Verificar todos os possíveis formatos do nome
     const possibleNames = [
       instanceName,
-      instanceName.endsWith("_Cliente") ? instanceName : `${instanceName}_Cliente`,
-      instanceName.replace("_Cliente", "")
+      fullName,
+      baseName,
+      instanceName.toLowerCase(),
+      fullName.toLowerCase(),
+      baseName.toLowerCase()
     ];
     
-    console.log(`Nomes possíveis para busca: ${possibleNames.join(", ")}`);
+    console.log(`Verificando correspondências para: ${possibleNames.join(', ')}`);
     
-    // Debug - listar todas as instâncias e seus status
-    console.log("Lista de todas as instâncias disponíveis:");
-    instances.forEach((instance, index) => {
-      console.log(`${index + 1}. ${instance.instanceName} (status: ${instance.status || 'N/A'})`);
-    });
-    
-    // Verificar se algum dos possíveis nomes existe nas instâncias
-    // Tornando a comparação case-insensitive
-    const foundInstance = instances.find(instance => 
-      possibleNames.some(name => 
-        instance.instanceName?.toLowerCase() === name.toLowerCase()
-      )
-    );
-    
-    if (foundInstance) {
-      console.log(`Instância encontrada: ${foundInstance.instanceName} com status: ${foundInstance.status}`);
-      return { 
-        exists: true, 
-        status: foundInstance.status 
-      };
-    } else {
-      // Se não encontrou, verificamos mais detalhadamente
-      // Verificação adicional para casos onde a API retorna instâncias com formato de nome diferente
-      console.log("Tentando verificação mais detalhada...");
-      for (const instance of instances) {
-        for (const name of possibleNames) {
-          if (instance.instanceName?.toLowerCase().includes(name.toLowerCase())) {
-            console.log(`Correspondência parcial encontrada: ${instance.instanceName} contém ${name}`);
-            return {
-              exists: true,
-              status: instance.status
-            };
-          }
+    // Verificar correspondências de forma mais flexível
+    for (const instance of instances) {
+      if (!instance.instanceName) continue;
+      
+      const currentName = instance.instanceName.toLowerCase();
+      
+      // Verificar se algum dos possíveis nomes corresponde
+      for (const name of possibleNames) {
+        if (currentName === name.toLowerCase() || currentName.includes(baseName.toLowerCase())) {
+          console.log(`Instância encontrada: ${instance.instanceName} com status: ${instance.status || 'N/A'}`);
+          return {
+            exists: true,
+            status: instance.status
+          };
         }
       }
-      
-      console.log("Nenhuma instância correspondente encontrada");
-      return { exists: false };
     }
+    
+    console.log("Nenhuma instância correspondente encontrada após verificação minuciosa");
+    return { exists: false };
   } catch (error) {
     console.error("Erro ao verificar existência da instância:", error);
     return { exists: false };
@@ -261,7 +256,7 @@ export const deleteInstance = async (instanceName: string): Promise<any> => {
   }
 };
 
-// Função específica para verificar instâncias conectadas na inicialização
+// Função melhorada para verificar instâncias conectadas na inicialização
 export const verifyConnectedInstance = async (): Promise<{instanceName: string | null, status: string | null}> => {
   try {
     console.log("Verificando instâncias conectadas na inicialização...");
@@ -272,49 +267,129 @@ export const verifyConnectedInstance = async (): Promise<{instanceName: string |
       return {instanceName: null, status: null};
     }
     
-    // Verificar quais instâncias estão conectadas
-    const connectedInstances = instances.filter(instance => 
-      instance.status === "CONNECTED" || 
-      instance.status === "ONLINE" || 
-      instance.status === "On" ||
-      instance.status === "Connected"
-    );
+    // Debug - mostrar todas as instâncias recebidas da API
+    console.log(`Total de instâncias recebidas: ${instances.length}`);
+    instances.forEach((inst, idx) => {
+      const name = inst.instanceName || inst.name || 'N/A';
+      const status = inst.status || inst.connectionStatus || 'N/A';
+      console.log(`${idx + 1}. Nome: ${name} | Status: ${status}`);
+    });
     
-    if (connectedInstances.length > 0) {
-      const instance = connectedInstances[0];
-      const normalizedName = instance.instanceName?.replace("_Cliente", "") || null;
+    // Verificar instâncias conectadas com uma abordagem mais flexível
+    // Procurar por diferentes formatos/propriedades de status
+    for (const instance of instances) {
+      // Na Evolution V2, o status pode estar em diferentes propriedades
+      const instanceName = instance.instanceName || instance.name;
+      const connectionStatus = instance.status || instance.connectionStatus;
       
-      console.log(`Instância conectada encontrada: ${instance.instanceName} (normalizada: ${normalizedName})`);
-      return {
-        instanceName: normalizedName,
-        status: instance.status || "Connected"
-      };
-    }
-    
-    // Se não encontrou nenhuma conectada, tentar buscar pelo localStorage
-    const storedName = localStorage.getItem('instanceName');
-    if (storedName) {
-      // Verificar se a instância armazenada existe
-      const storedInstance = instances.find(instance => 
-        instance.instanceName?.toLowerCase() === storedName.toLowerCase() ||
-        instance.instanceName?.toLowerCase().includes(storedName.toLowerCase().replace("_Cliente", ""))
-      );
+      if (!instanceName) continue;
       
-      if (storedInstance) {
-        const normalizedName = storedInstance.instanceName?.replace("_Cliente", "") || null;
-        console.log(`Instância armazenada encontrada: ${storedInstance.instanceName} (normalizada: ${normalizedName}) com status: ${storedInstance.status || "Desconhecido"}`);
+      // Verificar diferentes valores que indicam conexão
+      const isConnected = 
+        connectionStatus === "CONNECTED" || 
+        connectionStatus === "ONLINE" || 
+        connectionStatus === "On" ||
+        connectionStatus === "Connected" ||
+        connectionStatus === "open"; // Adicionado "open" que aparece na Evolution v2
         
+      if (isConnected) {
+        console.log(`Instância conectada encontrada: ${instanceName} com status: ${connectionStatus}`);
+        // Normalizar o nome removendo o sufixo _Cliente para uso consistente na aplicação
+        const normalizedName = instanceName.replace("_Cliente", "");
         return {
           instanceName: normalizedName,
-          status: storedInstance.status || "Desconhecido"
+          status: connectionStatus
         };
       }
     }
     
-    console.log("Nenhuma instância conectada encontrada");
+    // Se não encontrou nenhuma conectada, verificar localmente
+    console.log("Nenhuma instância com status conectado encontrada na API");
+    
+    // Verificar no localStorage como fallback
+    const storedName = localStorage.getItem('instanceName');
+    if (storedName) {
+      // Verificar se esta instância existe na lista
+      const normalizedStoredName = storedName.replace("_Cliente", "");
+      const fullStoredName = normalizedStoredName + "_Cliente";
+      
+      // Procurar por possíveis variações de nome
+      for (const instance of instances) {
+        const instanceName = instance.instanceName || instance.name;
+        if (!instanceName) continue;
+        
+        if (instanceName.toLowerCase().includes(normalizedStoredName.toLowerCase()) ||
+            instanceName === storedName) {
+          console.log(`Instância do localStorage encontrada na API: ${instanceName}`);
+          return {
+            instanceName: normalizedStoredName,
+            status: instance.status || instance.connectionStatus || "Desconhecido"
+          };
+        }
+      }
+    }
+    
     return {instanceName: null, status: null};
   } catch (error) {
     console.error("Erro ao verificar instâncias conectadas:", error);
     return {instanceName: null, status: null};
+  }
+};
+
+// Nova função para obter detalhes diretos de uma instância específica
+export const getInstanceDetails = async (instanceName: string): Promise<EvoInstance | null> => {
+  try {
+    // Tentar diferentes variantes do nome
+    const baseName = instanceName.replace('_Cliente', '');
+    const fullName = baseName + '_Cliente';
+    
+    // Primeiro, tentar obter com o nome exato
+    const options = {
+      method: 'GET',
+      headers: {
+        'apikey': API_KEY,
+        'Content-Type': 'application/json'
+      }
+    };
+
+    // Tentar primeiro com o nome completo
+    console.log(`Buscando detalhes da instância: ${fullName}`);
+    let response = await fetch(`${API_URL}/instance/fetchInstance/${fullName}`, options);
+    
+    // Se falhou, tentar com o nome base
+    if (!response.ok) {
+      console.log(`Não encontrado como ${fullName}, tentando com ${instanceName}`);
+      response = await fetch(`${API_URL}/instance/fetchInstance/${instanceName}`, options);
+      
+      // Se ainda falhou, tentar fetch de todas as instâncias
+      if (!response.ok) {
+        console.log("Buscando em todas as instâncias...");
+        const allInstances = await fetchAllInstances();
+        
+        const matchedInstance = allInstances.find(inst => {
+          const instName = inst.instanceName || inst.name;
+          if (!instName) return false;
+          
+          return instName.toLowerCase() === instanceName.toLowerCase() ||
+                 instName.toLowerCase() === fullName.toLowerCase() ||
+                 instName.toLowerCase().includes(baseName.toLowerCase());
+        });
+        
+        if (matchedInstance) {
+          console.log(`Instância encontrada na lista completa: ${matchedInstance.instanceName}`);
+          return matchedInstance;
+        }
+        
+        console.log("Instância não encontrada em nenhuma verificação");
+        return null;
+      }
+    }
+    
+    const data = await response.json();
+    console.log("Detalhes da instância obtidos:", data);
+    return data;
+  } catch (error) {
+    console.error("Erro ao buscar detalhes da instância:", error);
+    return null;
   }
 };
