@@ -1,3 +1,4 @@
+
 // API Evo service for WhatsApp connection
 
 interface DifyConfig {
@@ -34,6 +35,7 @@ export const getDifyConfig = (instanceName: string): DifyConfig | null => {
   }
 };
 
+// Updated to accept a single config object
 export const saveDifyConfig = (config: DifyConfig) => {
   try {
     localStorage.setItem(`difyConfig_${config.instanceName}`, JSON.stringify(config));

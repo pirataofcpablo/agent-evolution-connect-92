@@ -330,7 +330,15 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
       
       if (success) {
         setIntegrationComplete(true);
-        saveDifyConfig(instanceName.replace("_Cliente", ""), config);
+        // Fix: Changed from saveDifyConfig(instanceName.replace("_Cliente", ""), config)
+        // to simply pass one argument - the config object with the instanceName included
+        saveDifyConfig({
+          instanceName: instanceName.replace("_Cliente", ""),
+          apiKey,
+          apiUrl,
+          applicationId,
+          modelType
+        });
         
         toast({
           title: "Integração realizada",
@@ -418,7 +426,15 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
       
       if (hasExistingWebhook) {
         console.log("Webhook já configurado, atualizando configuração local");
-        saveDifyConfig(instanceName.replace("_Cliente", ""), config);
+        // Fix: Changed from saveDifyConfig(instanceName.replace("_Cliente", ""), config)
+        // to pass a single config object with instanceName included
+        saveDifyConfig({
+          instanceName: instanceName.replace("_Cliente", ""),
+          apiKey,
+          apiUrl,
+          applicationId,
+          modelType
+        });
         setIntegrationComplete(true);
         
         toast({
@@ -448,7 +464,15 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
         console.error("Erro específico no registro do webhook:", webhookError);
         
         // Salvar configuração local mesmo com erro no webhook
-        saveDifyConfig(instanceName.replace("_Cliente", ""), config);
+        // Fix: Changed from saveDifyConfig(instanceName.replace("_Cliente", ""), config)
+        // to pass a single config object with instanceName included
+        saveDifyConfig({
+          instanceName: instanceName.replace("_Cliente", ""),
+          apiKey,
+          apiUrl,
+          applicationId,
+          modelType
+        });
         
         // Mostrar alerta específico de webhook
         setRegistrationError(`Configuração do Dify foi salva localmente, mas houve um problema no registro do webhook: ${webhookError.message || "Erro desconhecido no webhook"}`);
