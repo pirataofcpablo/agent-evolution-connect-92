@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Storefront, ShoppingBag } from 'lucide-react';
+import { Store, ShoppingBag } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
@@ -20,7 +20,7 @@ const CatalogPage = () => {
             className="flex items-center gap-2 text-lg h-14" 
             onClick={() => window.open("https://conheca.comprasofc.shop", "_blank")}
           >
-            <Storefront className="h-5 w-5" />
+            <Store className="h-5 w-5" />
             LOJA VIRTUAL
           </Button>
           <Button 
