@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { toast } from "@/components/ui/use-toast";
 import { Input } from "@/components/ui/input";
@@ -16,7 +17,7 @@ import {
   getInstanceDetails, 
   fetchAllInstances 
 } from '@/services/evoService';
-import { Loader2, Bot, CheckCircle, AlertCircle, InfoIcon, RefreshCw, ExternalLink } from "lucide-react";
+import { Loader2, Bot, CheckCircle, AlertCircle, InfoIcon, RefreshCw, ExternalLink, Copy } from "lucide-react";
 
 interface DifyIntegrationProps {
   instanceName: string;
@@ -37,6 +38,30 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
   const [instanceDetails, setInstanceDetails] = useState<any>(null);
   const [refreshingStatus, setRefreshingStatus] = useState(false);
   const [manualWebhookMode, setManualWebhookMode] = useState(false);
+  const [copySuccess, setCopySuccess] = useState<string | null>(null);
+  
+  // Função para copiar dados para a área de transferência com feedback
+  const copyToClipboard = (text: string, label: string) => {
+    navigator.clipboard.writeText(text)
+      .then(() => {
+        setCopySuccess(label);
+        setTimeout(() => setCopySuccess(null), 2000);
+        
+        toast({
+          title: "Copiado!",
+          description: `${label} copiado para a área de transferência.`,
+          duration: 2000,
+        });
+      })
+      .catch(err => {
+        console.error('Erro ao copiar:', err);
+        toast({
+          title: "Erro ao copiar",
+          description: "Não foi possível copiar o texto.",
+          variant: "destructive",
+        });
+      });
+  };
   
   // Nova função para verificar status da instância de forma mais robusta
   const verifyInstanceStatus = async () => {
@@ -422,6 +447,58 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
               Devido a limitações na API Evolution, pode ser necessário configurar o webhook do Dify manualmente.
               A configuração local foi salva e o serviço está parcialmente operacional.
             </p>
+            
+            {/* Informações para configuração manual */}
+            <div className="mt-3 p-3 rounded-md bg-black/30 border border-gray-700">
+              <h4 className="text-sm font-semibold text-yellow-400 mb-2">Dados para configuração manual:</h4>
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-400">URL da API Dify:</span>
+                  <div className="flex items-center gap-1">
+                    <span className="text-blue-400">{apiUrl}</span>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-7 w-7"
+                      onClick={() => copyToClipboard(apiUrl, "URL da API")}
+                    >
+                      <Copy className={`h-3.5 w-3.5 ${copySuccess === "URL da API" ? "text-green-400" : "text-gray-400"}`} />
+                    </Button>
+                  </div>
+                </div>
+                
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-400">API Key:</span>
+                  <div className="flex items-center gap-1">
+                    <span className="text-blue-400">{apiKey.substring(0, 10)}...</span>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-7 w-7"
+                      onClick={() => copyToClipboard(apiKey, "API Key")}
+                    >
+                      <Copy className={`h-3.5 w-3.5 ${copySuccess === "API Key" ? "text-green-400" : "text-gray-400"}`} />
+                    </Button>
+                  </div>
+                </div>
+                
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-400">Instância WhatsApp:</span>
+                  <div className="flex items-center gap-1">
+                    <span className="text-blue-400">{instanceDetails?.instanceName || instanceName}</span>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-7 w-7"
+                      onClick={() => copyToClipboard(instanceDetails?.instanceName || instanceName, "Nome da instância")}
+                    >
+                      <Copy className={`h-3.5 w-3.5 ${copySuccess === "Nome da instância" ? "text-green-400" : "text-gray-400"}`} />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
             <div className="mt-2">
               <p className="font-semibold">Configuração manual na Evolution API:</p>
               <ol className="list-decimal list-inside ml-2 mt-1 space-y-1">
@@ -437,10 +514,10 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
                 size="sm" 
                 variant="outline" 
                 className="mt-2 border-yellow-500 text-yellow-400 hover:bg-yellow-500/20"
-                onClick={() => window.open("https://v2.solucoesweb.uk/", "_blank")}
+                onClick={() => window.open("https://v2.solucoesweb.uk/manager", "_blank")}
               >
                 <ExternalLink className="h-4 w-4 mr-2" />
-                Acessar Evolution API
+                Acessar Evolution Manager
               </Button>
             </div>
           </AlertDescription>
