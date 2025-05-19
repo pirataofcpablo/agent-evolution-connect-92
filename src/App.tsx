@@ -1,31 +1,21 @@
 
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Index from "./pages/Index";
-import NotFound from "./pages/NotFound";
+import { Route, Routes } from 'react-router-dom';
+import Index from '@/pages/Index';
+import NotFound from '@/pages/NotFound';
+import ChatwootPage from '@/pages/ChatwootPage';
+import CampaignPage from '@/pages/CampaignPage';
 
-const queryClient = new QueryClient();
-
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/bots" element={<Index />} />
-          <Route path="/status" element={<Index />} />
-          {/* Removendo rotas para páginas que ainda não existem */}
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+function App() {
+  return (
+    <Routes>
+      <Route path="/" element={<Index />} />
+      <Route path="/bots" element={<Index />} />
+      <Route path="/status" element={<Index />} />
+      <Route path="/help" element={<ChatwootPage />} />
+      <Route path="/campaigns" element={<CampaignPage />} />
+      <Route path="*" element={<NotFound />} />
+    </Routes>
+  );
+}
 
 export default App;
