@@ -9,7 +9,7 @@ import {
   User,
   Calendar,
   Book,
-  HelpCircle,
+  MessageSquare,
   Users,
   LogOut
 } from "lucide-react";
@@ -103,8 +103,8 @@ const SideNav = () => {
             color="#800080" // Roxo como na imagem
           />
           <NavItem 
-            icon={<HelpCircle size={18} />} 
-            label="Ajuda" 
+            icon={<MessageSquare size={18} />} 
+            label="CRM WHATSAPP" 
             active={currentPath === "/help"} 
             to="/help" 
             color="#FFA500" // Laranja como na imagem
