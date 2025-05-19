@@ -146,7 +146,7 @@ const ChatwootPage = () => {
                 <li>
                   <strong className="text-blue-400">Crie uma caixa de entrada para WhatsApp</strong>
                   <p className="text-sm mt-1">
-                    No painel do Chatwoot, vá em "Configurações" > "Caixas de Entrada" > "Adicionar Caixa de Entrada" 
+                    No painel do Chatwoot, vá em "Configurações" {'->'} "Caixas de Entrada" {'->'} "Adicionar Caixa de Entrada" 
                     e selecione "WhatsApp" como canal.
                   </p>
                 </li>
