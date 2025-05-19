@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useLocation } from 'react-router-dom';
 import Header from "@/components/Header";
 import SideNav from "@/components/SideNav";
 import BotIntegration from "@/components/BotIntegration";
@@ -13,15 +14,27 @@ import { getN8nConfig } from '@/services/n8nService';
 import { verifyConnectedInstance, fetchAllInstances, getInstanceDetails } from '@/services/evoService';
 
 const Index = () => {
+  const location = useLocation();
   const [instanceConnected, setInstanceConnected] = useState(false);
   const [instanceName, setInstanceName] = useState("");
   const [difyConfigured, setDifyConfigured] = useState(false);
   const [n8nConfigured, setN8nConfigured] = useState(false);
-  const [activeTab, setActiveTab] = useState("conexao");
   const [loading, setLoading] = useState(true);
+
+  // Set initial tab based on path
+  const getInitialTab = () => {
+    if (location.pathname === "/bots") return "bots";
+    if (location.pathname === "/status") return "status";
+    return "conexao";
+  };
+
+  const [activeTab, setActiveTab] = useState(getInitialTab());
   
   // Check if an instance is connected when loading the page
   useEffect(() => {
+    // Update active tab when route changes
+    setActiveTab(getInitialTab());
+    
     const checkInstances = async () => {
       setLoading(true);
       try {
@@ -224,7 +237,7 @@ const Index = () => {
     };
     
     checkInstances();
-  }, []);
+  }, [location.pathname]);
 
   // Safe function to change tabs
   const handleTabChange = (value: string) => {

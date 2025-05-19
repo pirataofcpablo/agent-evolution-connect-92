@@ -17,8 +17,8 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Index />} />
-          <Route path="/bots" element={<Index initialTab="bots" />} />
-          <Route path="/status" element={<Index initialTab="status" />} />
+          <Route path="/bots" element={<Index />} />
+          <Route path="/status" element={<Index />} />
           {/* Removendo rotas para páginas que ainda não existem */}
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
