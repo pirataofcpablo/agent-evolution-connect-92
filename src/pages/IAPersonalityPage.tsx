@@ -1,6 +1,6 @@
 
 import { useState } from "react";
-import { Book, Iframe } from "lucide-react";
+import { Book, Frame } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -131,7 +131,7 @@ const IAPersonalityPage = () => {
             <Card className="bg-gray-900 border-gray-800">
               <CardHeader>
                 <div className="flex items-center">
-                  <Iframe className="mr-2 h-5 w-5 text-green-500" />
+                  <Frame className="mr-2 h-5 w-5 text-green-500" />
                   <CardTitle>Documento Carregado</CardTitle>
                 </div>
               </CardHeader>
