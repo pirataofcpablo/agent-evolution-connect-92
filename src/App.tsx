@@ -5,6 +5,7 @@ import NotFound from '@/pages/NotFound';
 import ChatwootPage from '@/pages/ChatwootPage';
 import CampaignPage from '@/pages/CampaignPage';
 import IAPersonalityPage from '@/pages/IAPersonalityPage';
+import CatalogPage from '@/pages/CatalogPage';
 
 function App() {
   return (
@@ -15,6 +16,7 @@ function App() {
       <Route path="/help" element={<ChatwootPage />} />
       <Route path="/campaigns" element={<CampaignPage />} />
       <Route path="/ia-personality" element={<IAPersonalityPage />} />
+      <Route path="/catalog" element={<CatalogPage />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
