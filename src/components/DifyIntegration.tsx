@@ -138,15 +138,9 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
       
       // Registrar o bot Dify na Evolution API
       console.log("Registrando bot na Evolution API...");
-      const registered = await registerDifyBot(fullInstanceName, config);
+      await registerDifyBot(fullInstanceName, config);
       
-      if (!registered) {
-        throw new Error("Não foi possível registrar o bot na instância WhatsApp");
-      }
-      
-      console.log("Bot registrado com sucesso.");
-      
-      // A configuração já foi salva dentro da função registerDifyBot
+      // Configuração já foi salva dentro da função registerDifyBot
       
       setIntegrationComplete(true);
       toast({

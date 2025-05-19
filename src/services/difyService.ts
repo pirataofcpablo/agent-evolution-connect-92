@@ -139,9 +139,8 @@ export const registerDifyBot = async (
   try {
     console.log(`Iniciando registro do bot Dify para a instância ${instanceName}`);
     
-    // Verificar se a instância existe antes de prosseguir
-    console.log("Verificando a existência da instância...");
-    const checkInstanceResponse = await fetch(`${EVO_API_URL}/instance/fetchInstances`, {
+    // Verificar instâncias disponíveis primeiro
+    const fetchInstancesResponse = await fetch(`${EVO_API_URL}/instance/fetchInstances`, {
       method: 'GET',
       headers: {
         'apikey': EVO_API_KEY,
@@ -149,46 +148,44 @@ export const registerDifyBot = async (
       }
     });
     
-    if (!checkInstanceResponse.ok) {
-      const errorText = await checkInstanceResponse.text();
-      console.error(`Erro ao verificar instâncias (${checkInstanceResponse.status}):`, errorText);
-      throw new Error("Não foi possível verificar as instâncias disponíveis");
+    if (!fetchInstancesResponse.ok) {
+      throw new Error(`Erro ao buscar instâncias: ${fetchInstancesResponse.status}`);
     }
     
-    const instances = await checkInstanceResponse.json();
+    const instances = await fetchInstancesResponse.json();
     console.log("Instâncias disponíveis:", instances);
     
-    // Verificar se a instância específica existe
-    const instanceExists = instances.find((instance: any) => instance.instanceName === instanceName);
+    // Verificar se a instância existe
+    const instanceExists = instances.some((instance: any) => 
+      instance.instanceName === instanceName);
+      
     if (!instanceExists) {
+      console.error(`Instância ${instanceName} não encontrada`);
       throw new Error(`Instância ${instanceName} não encontrada`);
     }
     
-    console.log(`Instância ${instanceName} encontrada, prosseguindo com a integração`);
+    console.log(`Instância ${instanceName} encontrada, procedendo com a integração`);
     
-    // Preparar URL da API do Dify para integração
+    // Formatar corretamente a URL da API Dify para a integração
     let difyApiUrl = config.apiUrl;
     if (!difyApiUrl.includes('/v1')) {
       difyApiUrl = difyApiUrl.endsWith('/') ? `${difyApiUrl}v1` : `${difyApiUrl}/v1`;
     }
     
-    // Preparar o corpo da requisição conforme documentação da Evolution API
+    // Criar objeto de integração conforme documentação da Evolution API
     const requestBody = {
-      enabled: true,
-      description: "Integração automática Dify",
-      settings: {
-        type: "Chat Bot",
+      webhook: {
         url: difyApiUrl,
-        apikey: config.apiKey,
-        triggerType: "All" // Responde a todas as mensagens
+        // Este é o formato correto para integração com Dify na Evolution API
+        apiKey: config.apiKey,
+        enabled: true
       }
     };
     
-    console.log(`Registrando chatbot Dify na instância ${instanceName}`);
-    console.log("Dados da integração:", JSON.stringify(requestBody, null, 2));
+    console.log(`Enviando solicitação para registrar chatbot Dify:`, requestBody);
     
-    // Chamada para o endpoint correto da Evolution API para configurar Dify
-    const integrationResponse = await fetch(`${EVO_API_URL}/dify/${instanceName}`, {
+    // Usar o endpoint correto da Evolution API para a integração com o Dify
+    const integrationResponse = await fetch(`${EVO_API_URL}/instance/dify/${instanceName}`, {
       method: 'POST',
       headers: {
         'apikey': EVO_API_KEY,
@@ -197,9 +194,7 @@ export const registerDifyBot = async (
       body: JSON.stringify(requestBody)
     });
     
-    // Tratamento detalhado da resposta para melhor diagnóstico
-    const statusCode = integrationResponse.status;
-    console.log(`Código de status da resposta: ${statusCode}`);
+    console.log(`Status da resposta: ${integrationResponse.status}`);
     
     if (!integrationResponse.ok) {
       let errorText = "";
@@ -209,24 +204,19 @@ export const registerDifyBot = async (
         errorText = "Não foi possível ler o erro";
       }
       
-      console.error(`Erro ao registrar chatbot Dify (${statusCode}):`, errorText);
-      throw new Error(`Falha ao registrar o chatbot Dify (Status ${statusCode}): ${errorText}`);
+      console.error(`Erro ao registrar bot Dify (${integrationResponse.status}):`, errorText);
+      throw new Error(`Falha ao registrar o bot Dify: ${errorText}`);
     }
     
-    // Processar a resposta bem-sucedida
+    // Processar resposta bem-sucedida
     const responseData = await integrationResponse.json();
-    console.log("Resposta do registro do chatbot Dify:", responseData);
+    console.log("Resposta da integração Dify:", responseData);
     
-    // Verificar se há mensagem de erro na resposta mesmo com status OK
-    if (responseData.error) {
-      throw new Error(`Erro retornado pela API: ${responseData.error}`);
-    }
-    
-    // Salvar configuração localmente sem o sufixo _Cliente
+    // Salvar configuração localmente
     const baseInstanceName = instanceName.replace("_Cliente", "");
     saveDifyConfig(baseInstanceName, config);
     
-    console.log(`Integração do chatbot Dify concluída com sucesso para ${baseInstanceName}`);
+    console.log(`Bot Dify registrado com sucesso para ${baseInstanceName}`);
     return true;
   } catch (error: any) {
     console.error("Erro ao registrar chatbot Dify:", error);
