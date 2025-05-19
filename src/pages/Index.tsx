@@ -37,9 +37,76 @@ const Index = () => {
           instances.forEach((inst, idx) => {
             console.log(`${idx + 1}. Nome: ${inst.instanceName || inst.name || 'N/A'} | Status: ${inst.status || inst.connectionStatus || 'N/A'}`);
           });
+          
+          // Verificar diretamente se há alguma instância com status "open" ou "connected"
+          for (const inst of instances) {
+            const status = inst.status || inst.connectionStatus;
+            const isConnected = 
+              status === "CONNECTED" || 
+              status === "ONLINE" || 
+              status === "On" ||
+              status === "Connected" ||
+              status === "open";
+              
+            if (isConnected) {
+              const instName = inst.instanceName || inst.name;
+              if (instName) {
+                const baseInstanceName = instName.replace("_Cliente", "");
+                setInstanceConnected(true);
+                setInstanceName(baseInstanceName);
+                
+                // Atualizar localStorage com dados verificados
+                localStorage.setItem('instanceName', instName);
+                localStorage.setItem('instanceStatus', status || 'Connected');
+                
+                // Check if there are Dify and n8n configurations
+                try {
+                  const difyConfig = getDifyConfig(baseInstanceName);
+                  const n8nConfig = getN8nConfig(baseInstanceName);
+                  
+                  console.log("Configuração Dify:", difyConfig ? "Encontrada" : "Não encontrada");
+                  console.log("Configuração n8n:", n8nConfig ? "Encontrada" : "Não encontrada");
+                  
+                  setDifyConfigured(!!difyConfig);
+                  setN8nConfigured(!!n8nConfig);
+                  
+                  // Redirect to status if already configured
+                  if (difyConfig || n8nConfig) {
+                    setActiveTab("status");
+                    
+                    // Show services that are active
+                    let activeServices = [];
+                    if (difyConfig) activeServices.push("Dify IA");
+                    if (n8nConfig) activeServices.push("n8n");
+                    
+                    const servicesMessage = activeServices.join(" e ");
+                    
+                    toast({
+                      title: "Serviços Ativos",
+                      description: `${servicesMessage} configurado${activeServices.length > 1 ? 's' : ''} e ativo${activeServices.length > 1 ? 's' : ''}`,
+                    });
+                  } else {
+                    // Se encontrou instância mas não tem configurações, ir para a aba de bots
+                    setActiveTab("bots");
+                    
+                    toast({
+                      title: "Instância Conectada",
+                      description: `Instância ${baseInstanceName} está conectada. Configure os bots agora.`,
+                    });
+                  }
+                } catch (error) {
+                  console.error("Erro ao verificar configurações:", error);
+                  setActiveTab("bots");
+                }
+                
+                setLoading(false);
+                return;
+              }
+            }
+          }
         }
         
-        // Verificar se alguma instância está conectada
+        // Verificar se alguma instância está conectada usando o método verifyConnectedInstance
         const { instanceName: connectedName, status } = await verifyConnectedInstance();
         
         if (connectedName) {

@@ -48,7 +48,11 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
       console.log(`Verificando status da instância: ${instanceName}`);
       
       // 1. Primeiro, tentar obter detalhes diretos da instância
-      const details = await getInstanceDetails(instanceName);
+      const baseName = instanceName.replace("_Cliente", "");
+      const fullName = `${baseName}_Cliente`;
+      
+      // Verificar com ambos os nomes possíveis
+      const details = await getInstanceDetails(fullName);
       setInstanceDetails(details);
       
       if (details) {
@@ -69,9 +73,9 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
         });
         
         if (connected) {
-          console.log(`Instância ${details.instanceName} está conectada!`);
+          console.log(`Instância ${details.instanceName || details.name} está conectada!`);
         } else {
-          setRegistrationError(`A instância ${details.instanceName} existe, mas não está conectada (status: ${status}). Verifique na aba Conectar.`);
+          setRegistrationError(`A instância ${details.instanceName || details.name} existe, mas não está conectada (status: ${status}). Verifique na aba Conectar.`);
         }
       } else {
         // 2. Se não obteve detalhes diretos, tentar buscar na lista de instâncias
@@ -79,20 +83,17 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
         const instances = await fetchAllInstances();
         
         // Verificar correspondências na lista
-        const normalizedName = instanceName.replace("_Cliente", "");
-        const fullName = normalizedName + "_Cliente";
-        
         const matchedInstance = instances.find(inst => {
           const instName = inst.instanceName || inst.name;
           if (!instName) return false;
           
-          return instName.toLowerCase() === instanceName.toLowerCase() ||
-                 instName.toLowerCase() === fullName.toLowerCase() ||
-                 instName.toLowerCase().includes(normalizedName.toLowerCase());
+          return instName.toLowerCase() === fullName.toLowerCase() ||
+                 instName.toLowerCase() === instanceName.toLowerCase() ||
+                 instName.toLowerCase().includes(baseName.toLowerCase());
         });
         
         if (matchedInstance) {
-          console.log(`Instância encontrada na lista completa: ${matchedInstance.instanceName}`);
+          console.log(`Instância encontrada na lista completa: ${matchedInstance.instanceName || matchedInstance.name}`);
           setInstanceDetails(matchedInstance);
           
           // Verificar status
@@ -110,7 +111,7 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
           });
           
           if (!connected) {
-            setRegistrationError(`A instância ${matchedInstance.instanceName} existe, mas não está conectada (status: ${status}). Verifique na aba Conectar.`);
+            setRegistrationError(`A instância ${matchedInstance.instanceName || matchedInstance.name} existe, mas não está conectada (status: ${status}). Verifique na aba Conectar.`);
           }
         } else {
           // 3. Se ainda não encontrou, usar o checkInstanceStatus como último recurso
@@ -339,7 +340,7 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
               <CheckCircle className="h-5 w-5 text-green-400" />
               <AlertTitle className="text-green-400">Instância Verificada</AlertTitle>
               <AlertDescription className="text-gray-300">
-                A instância {instanceDetails?.instanceName || instanceName} está conectada e pronta para integração.
+                A instância {instanceDetails?.instanceName || instanceDetails?.name || instanceName} está conectada e pronta para integração.
               </AlertDescription>
             </Alert>
           )}
@@ -349,7 +350,7 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
               <AlertCircle className="h-5 w-5 text-yellow-400" />
               <AlertTitle className="text-yellow-400">Instância Desconectada</AlertTitle>
               <AlertDescription className="text-gray-300">
-                A instância {instanceDetails?.instanceName || instanceName} existe, mas não está conectada. Volte à aba Conectar e escaneie o QR Code.
+                A instância {instanceDetails?.instanceName || instanceDetails?.name || instanceName} existe, mas não está conectada. Volte à aba Conectar e escaneie o QR Code.
               </AlertDescription>
             </Alert>
           )}
@@ -468,7 +469,7 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
             <div className="flex justify-between">
               <span className="text-gray-300">Instância conectada:</span>
               <span className="text-blue-400">
-                {instanceDetails?.instanceName || instanceName || "Nenhuma"}
+                {instanceDetails?.instanceName || instanceDetails?.name || instanceName || "Nenhuma"}
               </span>
             </div>
           </div>

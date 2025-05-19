@@ -4,12 +4,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/components/ui/use-toast";
 import { checkInstanceStatus } from '@/services/difyService';
-import { verifyConnectedInstance, getInstanceStatus } from '@/services/evoService';
+import { verifyConnectedInstance, getInstanceStatus, fetchAllInstances, getInstanceDetails } from '@/services/evoService';
 import DifyIntegration from './DifyIntegration';
 import N8nIntegration from './N8nIntegration';
 import IntegrationCard from './IntegrationCard';
-import { Loader2, RefreshCw } from 'lucide-react';
+import { Loader2, RefreshCw, AlertCircle } from 'lucide-react';
 import { Button } from './ui/button';
+import { Alert, AlertDescription, AlertTitle } from "./ui/alert";
 
 interface BotIntegrationProps {
   instanceConnected: boolean;
@@ -26,6 +27,7 @@ const BotIntegration: React.FC<BotIntegrationProps> = ({
   const [instanceName, setInstanceName] = useState(initialInstanceName);
   const [instanceError, setInstanceError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [instanceDetails, setInstanceDetails] = useState<any>(null);
   
   // Função para atualizar manualmente o status da instância
   const handleRefreshStatus = async () => {
@@ -40,46 +42,124 @@ const BotIntegration: React.FC<BotIntegrationProps> = ({
   // Função para verificar o status da instância diretamente na API Evolution
   const checkInstanceConnection = async () => {
     setVerifyingInstance(true);
+    setInstanceError(null);
+    
     try {
       console.log("Verificando conexão da instância diretamente na API Evolution...");
       
-      // Verificar instâncias conectadas na Evolution API
+      // 1. Primeiro, tentar obter direto da API
       const { instanceName: connectedName, status } = await verifyConnectedInstance();
       
       if (connectedName) {
         console.log(`Instância encontrada na Evolution API: ${connectedName} com status: ${status}`);
+        
+        // Obter detalhes completos da instância
+        const instanceWithSuffix = `${connectedName}_Cliente`;
+        const details = await getInstanceDetails(instanceWithSuffix);
+        setInstanceDetails(details);
+        
         setInstanceName(connectedName);
         setInstanceConnected(true);
         setInstanceError(null);
         
         // Atualizar localStorage com a instância verificada
-        localStorage.setItem('instanceName', `${connectedName}_Cliente`);
+        localStorage.setItem('instanceName', instanceWithSuffix);
         localStorage.setItem('instanceStatus', status || 'Connected');
         
         toast({
           title: "Instância verificada",
           description: `${connectedName} está conectada à Evolution API.`,
         });
-      } else {
-        console.log("Nenhuma instância conectada encontrada na Evolution API.");
         
-        // Se não encontrou na verificação direta, tentar pelo nome armazenado
-        if (initialInstanceName) {
-          const status = await getInstanceStatus(initialInstanceName);
+        return;
+      }
+      
+      // 2. Se não encontrar, tentar buscar todas as instâncias
+      console.log("Nenhuma instância conectada encontrada pelo verifyConnectedInstance. Tentando buscar todas...");
+      const allInstances = await fetchAllInstances();
+      
+      if (Array.isArray(allInstances) && allInstances.length > 0) {
+        console.log(`Encontradas ${allInstances.length} instâncias. Verificando status...`);
+        
+        // Procurar qualquer instância conectada
+        for (const inst of allInstances) {
+          const name = inst.instanceName || inst.name;
+          const instStatus = inst.status || inst.connectionStatus;
           
-          if (status) {
-            console.log(`Instância ${initialInstanceName} encontrada com status: ${status}`);
+          // Verificar se está conectada
+          const isConnected = 
+            instStatus === "CONNECTED" || 
+            instStatus === "ONLINE" || 
+            instStatus === "On" ||
+            instStatus === "Connected" ||
+            instStatus === "open";
+            
+          if (name && isConnected) {
+            console.log(`Instância conectada encontrada: ${name} com status: ${instStatus}`);
+            setInstanceDetails(inst);
+            
+            const normalizedName = name.replace("_Cliente", "");
+            setInstanceName(normalizedName);
             setInstanceConnected(true);
             setInstanceError(null);
-          } else {
-            console.log(`Instância ${initialInstanceName} não encontrada ou não está conectada.`);
-            setInstanceConnected(false);
-            setInstanceError(`Instância ${initialInstanceName} não encontrada ou não está conectada. Verifique na aba Conectar.`);
+            
+            localStorage.setItem('instanceName', name);
+            localStorage.setItem('instanceStatus', instStatus);
+            
+            toast({
+              title: "Instância encontrada",
+              description: `${normalizedName} está conectada.`,
+            });
+            
+            return;
           }
-        } else {
-          setInstanceConnected(false);
-          setInstanceError("Nenhuma instância conectada encontrada. Por favor, conecte uma instância primeiro.");
         }
+      }
+      
+      // 3. Se ainda não encontrou, verificar pelo nome armazenado
+      if (initialInstanceName) {
+        console.log(`Verificando instância específica: ${initialInstanceName}`);
+        
+        // Formato com e sem sufixo
+        const baseName = initialInstanceName.replace("_Cliente", "");
+        const fullName = baseName + "_Cliente";
+        
+        const details = await getInstanceDetails(fullName);
+        
+        if (details) {
+          console.log(`Detalhes da instância ${fullName}:`, details);
+          setInstanceDetails(details);
+          
+          const status = details.status || details.connectionStatus;
+          const isConnected = 
+            status === "CONNECTED" || 
+            status === "ONLINE" || 
+            status === "On" ||
+            status === "Connected" ||
+            status === "open";
+            
+          setInstanceConnected(isConnected);
+          
+          if (isConnected) {
+            setInstanceError(null);
+            
+            toast({
+              title: "Instância verificada",
+              description: `${baseName} está conectada.`,
+            });
+          } else {
+            setInstanceError(`Instância ${baseName} encontrada, mas com status: ${status}. Verifique na aba Conectar.`);
+          }
+          
+          return;
+        }
+        
+        // Se a instância existe mas não foi encontrada
+        setInstanceConnected(false);
+        setInstanceError(`Instância ${initialInstanceName} não encontrada ou não está conectada. Verifique na aba Conectar.`);
+      } else {
+        setInstanceConnected(false);
+        setInstanceError("Nenhuma instância conectada encontrada. Por favor, conecte uma instância primeiro.");
       }
     } catch (error) {
       console.error("Erro ao verificar instância:", error);
@@ -182,6 +262,17 @@ const BotIntegration: React.FC<BotIntegrationProps> = ({
         </Button>
       </CardHeader>
       <CardContent>
+        {instanceDetails && (
+          <Alert className="bg-green-900/20 border-green-500/30 mb-4">
+            <AlertCircle className="h-5 w-5 text-green-400" />
+            <AlertTitle className="text-green-400">Instância Verificada</AlertTitle>
+            <AlertDescription className="text-gray-300">
+              A instância {instanceDetails?.instanceName || instanceDetails?.name || instanceName} 
+              está conectada com status: {instanceDetails?.status || instanceDetails?.connectionStatus || "Conectado"}
+            </AlertDescription>
+          </Alert>
+        )}
+        
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="grid grid-cols-3 mb-8">
             <TabsTrigger value="overview">Visão Geral</TabsTrigger>

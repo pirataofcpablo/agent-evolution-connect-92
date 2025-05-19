@@ -1,3 +1,4 @@
+
 // API Evo service for WhatsApp connection
 
 interface DifyConfig {
@@ -101,7 +102,7 @@ export const checkInstanceStatus = async (instanceName: string): Promise<{exists
       const instanceDetails = await getInstanceDetails(instanceName);
       
       if (instanceDetails) {
-        console.log(`Instância encontrada diretamente: ${instanceDetails.instanceName}`);
+        console.log(`Instância encontrada diretamente: ${instanceDetails.instanceName || instanceDetails.name}`);
         const status = instanceDetails.status || instanceDetails.connectionStatus || "Unknown";
         
         const isConnected = 
@@ -137,16 +138,16 @@ export const checkInstanceStatus = async (instanceName: string): Promise<{exists
       
       // Procurar correspondência na lista de instâncias
       for (const instance of instances) {
-        if (!instance.instanceName) continue;
+        if (!instance.instanceName && !instance.name) continue;
         
-        const currentName = instance.instanceName.toLowerCase();
+        const currentName = (instance.instanceName || instance.name || "").toLowerCase();
         
         // Verificar correspondências
         for (const name of possibleNames) {
           if (currentName === name.toLowerCase() || 
               currentName.includes(normalizedName.toLowerCase())) {
             
-            console.log(`Instância encontrada: ${instance.instanceName} com status: ${instance.status || 'N/A'}`);
+            console.log(`Instância encontrada: ${instance.instanceName || instance.name} com status: ${instance.status || instance.connectionStatus || 'N/A'}`);
             
             const status = instance.status || instance.connectionStatus || "Unknown";
             const isConnected = 
@@ -244,14 +245,97 @@ export const registerDifyBot = async (
     const instanceDetails = await getInstanceDetails(instanceName);
     
     if (!instanceDetails) {
-      throw new Error(`Não foi possível encontrar detalhes da instância ${instanceName}. Verifique se o nome está correto.`);
+      // Se não encontrou por este nome, tentar com o sufixo
+      const alternativeDetails = await getInstanceDetails(instanceWithSuffix);
+      
+      if (!alternativeDetails) {
+        // Se ainda não encontrou, tentar com o nome base
+        const baseNameDetails = await getInstanceDetails(baseName);
+        
+        if (!baseNameDetails) {
+          // Verificar em todas as instâncias disponíveis
+          const allInstances = await fetchAllInstances();
+          let foundInstance = false;
+          let actualInstanceName = instanceWithSuffix;
+          
+          if (Array.isArray(allInstances) && allInstances.length > 0) {
+            for (const inst of allInstances) {
+              const instName = inst.instanceName || inst.name || "";
+              
+              if (
+                instName.toLowerCase() === instanceName.toLowerCase() ||
+                instName.toLowerCase() === instanceWithSuffix.toLowerCase() ||
+                instName.toLowerCase() === baseName.toLowerCase() ||
+                instName.toLowerCase().includes(baseName.toLowerCase())
+              ) {
+                foundInstance = true;
+                actualInstanceName = instName;
+                console.log(`Instância encontrada na lista: ${instName}`);
+                break;
+              }
+            }
+          }
+          
+          if (!foundInstance) {
+            throw new Error(`Não foi possível encontrar a instância ${instanceName}. Verifique se a instância está conectada.`);
+          }
+          
+          // Continuar com o nome encontrado
+          console.log(`Usando nome de instância encontrado: ${actualInstanceName}`);
+          
+          // Formatar corretamente a URL da API Dify para a integração
+          let difyApiUrl = config.apiUrl;
+          if (!difyApiUrl.includes('/v1')) {
+            difyApiUrl = difyApiUrl.endsWith('/') ? `${difyApiUrl}v1` : `${difyApiUrl}/v1`;
+          }
+          
+          // Construir o corpo da solicitação
+          const requestBody = {
+            url: difyApiUrl,
+            apiKey: config.apiKey,
+            enabled: true
+          };
+          
+          console.log(`Enviando solicitação para registrar chatbot Dify usando instância: ${actualInstanceName}`);
+          
+          // URL da integração com o nome encontrado
+          const integrationUrl = `${EVO_API_URL}/webhook/dify/${actualInstanceName}`;
+          console.log(`URL para integração: ${integrationUrl}`);
+          
+          const integrationResponse = await fetch(integrationUrl, {
+            method: 'POST',
+            headers: {
+              'apikey': EVO_API_KEY,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(requestBody)
+          });
+          
+          console.log(`Status da resposta: ${integrationResponse.status}`);
+          
+          if (!integrationResponse.ok) {
+            const errorText = await integrationResponse.text();
+            throw new Error(`Falha ao integrar o bot Dify: ${errorText}`);
+          }
+          
+          // Processar resposta bem-sucedida
+          const responseData = await integrationResponse.json();
+          console.log("Resposta da integração Dify:", responseData);
+          
+          // Salvar configuração localmente
+          saveDifyConfig(baseName, config);
+          
+          console.log(`Bot Dify registrado com sucesso para ${baseName}`);
+          return true;
+        }
+      }
     }
     
-    console.log(`Detalhes da instância encontrados: ${JSON.stringify(instanceDetails)}`);
+    console.log(`Detalhes da instância encontrados: Nome=${instanceDetails?.instanceName || instanceDetails?.name || 'N/A'}`);
     
     // Determinar qual nome usar para a integração (com ou sem sufixo)
     // Usar o nome exato como retornado pela API
-    const finalInstanceName = instanceDetails.instanceName || instanceWithSuffix;
+    const finalInstanceName = instanceDetails?.instanceName || instanceDetails?.name || instanceWithSuffix;
     console.log(`Nome final para integração: ${finalInstanceName}`);
     
     // Formatar corretamente a URL da API Dify para a integração

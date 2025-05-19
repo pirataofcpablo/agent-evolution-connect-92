@@ -5,10 +5,27 @@ const API_URL = "https://v2.solucoesweb.uk";
 
 export interface EvoInstance {
   instanceName: string;
+  name?: string; // Added for API compatibility
   status?: string;
+  connectionStatus?: string; // Added for API compatibility
   qrcode?: {
     base64: string;
   };
+  // Additional fields that may come from the API
+  id?: string;
+  ownerJid?: string;
+  profileName?: string;
+  profilePicUrl?: string;
+  integration?: string;
+  number?: string | null;
+  businessId?: string | null;
+  token?: string;
+  clientName?: string;
+  disconnectionReasonCode?: string | null;
+  disconnectionObject?: any;
+  disconnectionAt?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export const createEvoInstance = async (name: string): Promise<EvoInstance> => {
@@ -141,7 +158,7 @@ export const checkInstanceExists = async (instanceName: string): Promise<{exists
     if (Array.isArray(instances)) {
       console.log("Lista completa de instâncias da API Evolution:");
       instances.forEach((inst, idx) => {
-        console.log(`${idx + 1}. Nome: ${inst.instanceName || 'N/A'} | Status: ${inst.status || 'N/A'}`);
+        console.log(`${idx + 1}. Nome: ${inst.instanceName || inst.name || 'N/A'} | Status: ${inst.status || inst.connectionStatus || 'N/A'}`);
       });
     }
     
@@ -163,17 +180,17 @@ export const checkInstanceExists = async (instanceName: string): Promise<{exists
     
     // Verificar correspondências de forma mais flexível
     for (const instance of instances) {
-      if (!instance.instanceName) continue;
+      if (!instance.instanceName && !instance.name) continue;
       
-      const currentName = instance.instanceName.toLowerCase();
+      const currentName = (instance.instanceName || instance.name || "").toLowerCase();
       
       // Verificar se algum dos possíveis nomes corresponde
       for (const name of possibleNames) {
         if (currentName === name.toLowerCase() || currentName.includes(baseName.toLowerCase())) {
-          console.log(`Instância encontrada: ${instance.instanceName} com status: ${instance.status || 'N/A'}`);
+          console.log(`Instância encontrada: ${instance.instanceName || instance.name} com status: ${instance.status || instance.connectionStatus || 'N/A'}`);
           return {
             exists: true,
-            status: instance.status
+            status: instance.status || instance.connectionStatus
           };
         }
       }
@@ -275,7 +292,7 @@ export const verifyConnectedInstance = async (): Promise<{instanceName: string |
       console.log(`${idx + 1}. Nome: ${name} | Status: ${status}`);
     });
     
-    // Verificar instâncias conectadas com uma abordagem mais flexível
+    // Verificar instâncias conectadas com uma abordagem mais robusta
     // Procurar por diferentes formatos/propriedades de status
     for (const instance of instances) {
       // Na Evolution V2, o status pode estar em diferentes propriedades
