@@ -114,7 +114,8 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
         throw new Error("Nome da instância não fornecido");
       }
       
-      const fullInstanceName = `${instanceName}_Cliente`;
+      // Usando o nome da instância com ou sem sufixo _Cliente
+      const fullInstanceName = instanceName.includes("_Cliente") ? instanceName : `${instanceName}_Cliente`;
       
       console.log("Iniciando integração com Dify para a instância:", fullInstanceName);
       

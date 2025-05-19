@@ -139,7 +139,9 @@ export const registerDifyBot = async (
   try {
     console.log(`Iniciando registro do bot Dify para a instância ${instanceName}`);
     
-    // Verificar instâncias disponíveis primeiro
+    // Verificar se a instância existe usando o endpoint correto
+    console.log(`Verificando se a instância ${instanceName} existe...`);
+    
     const fetchInstancesResponse = await fetch(`${EVO_API_URL}/instance/fetchInstances`, {
       method: 'GET',
       headers: {
@@ -149,19 +151,36 @@ export const registerDifyBot = async (
     });
     
     if (!fetchInstancesResponse.ok) {
+      const errorText = await fetchInstancesResponse.text();
+      console.error(`Erro ao buscar instâncias (${fetchInstancesResponse.status}): ${errorText}`);
       throw new Error(`Erro ao buscar instâncias: ${fetchInstancesResponse.status}`);
     }
     
     const instances = await fetchInstancesResponse.json();
     console.log("Instâncias disponíveis:", instances);
     
-    // Verificar se a instância existe
-    const instanceExists = instances.some((instance: any) => 
-      instance.instanceName === instanceName);
-      
+    // Verificar se a instância existe por nome exato
+    const instanceExists = Array.isArray(instances) && instances.some((instance: any) => {
+      console.log(`Comparando: '${instance.instanceName?.toLowerCase()}' com '${instanceName.toLowerCase()}'`);
+      return instance.instanceName?.toLowerCase() === instanceName.toLowerCase();
+    });
+    
+    console.log(`Instância ${instanceName} existe? ${instanceExists ? "Sim" : "Não"}`);
+    
     if (!instanceExists) {
-      console.error(`Instância ${instanceName} não encontrada`);
-      throw new Error(`Instância ${instanceName} não encontrada`);
+      // Se não encontrar com o sufixo _Cliente, tente sem ele
+      const baseInstanceName = instanceName.replace("_Cliente", "");
+      const baseInstanceExists = Array.isArray(instances) && instances.some((instance: any) => {
+        return instance.instanceName?.toLowerCase() === baseInstanceName.toLowerCase();
+      });
+      
+      if (baseInstanceExists) {
+        console.log(`Encontrada instância com nome base: ${baseInstanceName}`);
+        instanceName = baseInstanceName; // Use o nome sem sufixo
+      } else {
+        console.error(`Instância ${instanceName} não encontrada`);
+        throw new Error(`Instância ${instanceName} não encontrada. Verifique se a instância está conectada.`);
+      }
     }
     
     console.log(`Instância ${instanceName} encontrada, procedendo com a integração`);
@@ -172,20 +191,23 @@ export const registerDifyBot = async (
       difyApiUrl = difyApiUrl.endsWith('/') ? `${difyApiUrl}v1` : `${difyApiUrl}/v1`;
     }
     
-    // Criar objeto de integração conforme documentação da Evolution API
+    // Usar o endpoint correto para registrar o webhook do Dify
+    console.log(`Registrando webhook para Dify na instância ${instanceName}`);
+    
+    // Corpo da requisição conforme documentação da Evolution API para integração Dify
     const requestBody = {
-      webhook: {
-        url: difyApiUrl,
-        // Este é o formato correto para integração com Dify na Evolution API
-        apiKey: config.apiKey,
-        enabled: true
-      }
+      url: difyApiUrl,
+      apiKey: config.apiKey,
+      enabled: true
     };
     
     console.log(`Enviando solicitação para registrar chatbot Dify:`, requestBody);
     
-    // Usar o endpoint correto da Evolution API para a integração com o Dify
-    const integrationResponse = await fetch(`${EVO_API_URL}/instance/dify/${instanceName}`, {
+    // Usar o endpoint correto para integração com o Dify
+    const integrationUrl = `${EVO_API_URL}/webhook/dify/${instanceName}`;
+    console.log(`URL para integração: ${integrationUrl}`);
+    
+    const integrationResponse = await fetch(integrationUrl, {
       method: 'POST',
       headers: {
         'apikey': EVO_API_KEY,
