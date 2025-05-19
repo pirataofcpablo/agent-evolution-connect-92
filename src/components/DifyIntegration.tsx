@@ -12,13 +12,15 @@ import {
   testDifyConnection, 
   registerDifyBot, 
   checkInstanceStatus,
-  checkExistingWebhooks
+  checkExistingWebhooks,
+  setupDifyWebhookViaProxy
 } from '@/services/difyService';
 import { 
   getInstanceDetails, 
   fetchAllInstances 
 } from '@/services/evoService';
-import { Loader2, Bot, CheckCircle, AlertCircle, InfoIcon, RefreshCw, ExternalLink, Copy, RotateCw } from "lucide-react";
+import { Loader2, Bot, CheckCircle, AlertCircle, InfoIcon, RefreshCw, ExternalLink, Copy, RotateCw, Settings } from "lucide-react";
+import DifySetupIframe from './DifySetupIframe';
 
 interface DifyIntegrationProps {
   instanceName: string;
@@ -43,6 +45,8 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
   const [integrationAttempts, setIntegrationAttempts] = useState(0);
   const [existingWebhooks, setExistingWebhooks] = useState<any[]>([]);
   const [processingStatus, setProcessingStatus] = useState<string | null>(null);
+  const [showIframe, setShowIframe] = useState(false);
+  const [usingProxySetup, setUsingProxySetup] = useState(false);
   
   // Função para copiar dados para a área de transferência com feedback
   const copyToClipboard = (text: string, label: string) => {
@@ -294,6 +298,64 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
   const handleManualWebhookToggle = () => {
     setManualWebhookMode(!manualWebhookMode);
   };
+  
+  // Função para mostrar iframe de configuração
+  const handleShowIframe = () => {
+    setShowIframe(true);
+  };
+
+  // Função para configurar via proxy
+  const handleProxySetup = async () => {
+    if (!apiKey || !applicationId) {
+      toast({
+        title: "Campos obrigatórios",
+        description: "Por favor, preencha todos os campos obrigatórios",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setUsingProxySetup(true);
+    setProcessingStatus("Configurando webhook via proxy...");
+    
+    try {
+      const config = {
+        apiKey,
+        apiUrl,
+        applicationId,
+        modelType
+      };
+      
+      const success = await setupDifyWebhookViaProxy(instanceName, config);
+      
+      if (success) {
+        setIntegrationComplete(true);
+        saveDifyConfig(instanceName.replace("_Cliente", ""), config);
+        
+        toast({
+          title: "Integração realizada",
+          description: "O bot Dify foi integrado com sucesso à instância " + instanceName,
+        });
+        
+        // Verificar se o webhook foi realmente registrado
+        await checkWebhooks();
+      } else {
+        throw new Error("Não foi possível configurar o webhook via proxy.");
+      }
+    } catch (error: any) {
+      console.error("Erro na configuração via proxy:", error);
+      setRegistrationError(error.message);
+      
+      toast({
+        title: "Erro na configuração",
+        description: error.message || "Não foi possível configurar o webhook via proxy.",
+        variant: "destructive",
+      });
+    } finally {
+      setUsingProxySetup(false);
+      setProcessingStatus(null);
+    }
+  };
 
   const handleSaveIntegration = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -427,6 +489,18 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
 
   return (
     <div className="space-y-6">
+      <DifySetupIframe
+        isOpen={showIframe}
+        onClose={() => setShowIframe(false)}
+        instanceName={instanceName}
+        config={{
+          apiKey,
+          apiUrl,
+          applicationId,
+          modelType
+        }}
+      />
+      
       <div className="p-4 bg-blue-900/20 border border-blue-700/30 rounded-md mb-6">
         <h3 className="text-lg font-medium text-blue-400 mb-2">Sobre a integração com Dify</h3>
         <p className="text-gray-300">
@@ -587,21 +661,36 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
               </div>
             </div>
             
-            <div className="mt-2">
-              <p className="font-semibold">Configuração manual na Evolution API:</p>
-              <ol className="list-decimal list-inside ml-2 mt-1 space-y-1">
-                <li>Acesse o painel da Evolution API</li>
-                <li>Vá para Configurações {'>'} Webhooks ou Bots</li>
-                <li>Adicione um novo webhook do tipo "Dify IA"</li>
-                <li>Use a mesma API Key e URL configuradas aqui</li>
-                <li>Ative o webhook para a instância {instanceName}</li>
-              </ol>
-            </div>
-            <div className="mt-3 flex">
+            <div className="mt-4 flex flex-wrap gap-2">
               <Button 
                 size="sm" 
                 variant="outline" 
-                className="mt-2 border-yellow-500 text-yellow-400 hover:bg-yellow-500/20"
+                className="border-blue-500 text-blue-400 hover:bg-blue-500/20"
+                onClick={handleShowIframe}
+              >
+                <Settings className="h-4 w-4 mr-2" />
+                Configurar no Navegador
+              </Button>
+              
+              <Button 
+                size="sm" 
+                variant="outline" 
+                className="border-green-500 text-green-400 hover:bg-green-500/20"
+                onClick={handleProxySetup}
+                disabled={usingProxySetup}
+              >
+                {usingProxySetup ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : (
+                  <Bot className="h-4 w-4 mr-2" />
+                )}
+                Configurar via Proxy
+              </Button>
+              
+              <Button 
+                size="sm" 
+                variant="outline" 
+                className="border-yellow-500 text-yellow-400 hover:bg-yellow-500/20"
                 onClick={() => window.open("https://v2.solucoesweb.uk/manager", "_blank")}
               >
                 <ExternalLink className="h-4 w-4 mr-2" />
@@ -633,7 +722,7 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
       )}
 
       {/* Exibir o status de processamento quando estiver carregando */}
-      {isLoading && processingStatus && (
+      {(isLoading || usingProxySetup) && processingStatus && (
         <div className="p-3 bg-blue-900/20 rounded-md flex items-center">
           <RotateCw className="h-5 w-5 animate-spin text-blue-500 mr-2" />
           <span className="text-blue-300">{processingStatus}</span>
@@ -754,7 +843,7 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
           </Button>
           <Button 
             type="submit" 
-            disabled={isLoading || (integrationComplete && !manualWebhookMode && existingWebhooks.length > 0) || 
+            disabled={isLoading || usingProxySetup || (integrationComplete && !manualWebhookMode && existingWebhooks.length > 0) || 
                      !connectionSuccess || (instanceStatus && (!instanceStatus.exists || !instanceStatus.connected))}
             className="bg-blue-600 hover:bg-blue-700"
           >

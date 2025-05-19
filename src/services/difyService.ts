@@ -315,14 +315,14 @@ export const registerDifyBot = async (
       url: `${EVO_API_URL}/webhook/set`,
       method: 'POST',
       body: {
-        instance: exactInstanceName,
         webhook: {
           url: difyApiUrl,
           apiKey: config.apiKey
         },
         events: ["all"],
         enabled: true,
-        type: "dify"
+        type: "dify",
+        instanceName: exactInstanceName
       }
     });
     
@@ -504,6 +504,97 @@ export const checkExistingWebhooks = async (instanceName: string): Promise<any[]
   } catch (error) {
     console.error("Erro ao verificar webhooks existentes:", error);
     return [];
+  }
+};
+
+// Função para configurar webhook diretamente via iframe
+export const setupDifyWebhookViaIframe = async (
+  instanceName: string,
+  config: DifyConfig
+): Promise<string> => {
+  // Esta função gera um URL que pode ser usado em um iframe para configuração
+  const EVO_API_URL = "https://v2.solucoesweb.uk";
+  
+  try {
+    // Normalizar o nome da instância
+    const baseName = instanceName.replace("_Cliente", "");
+    const instanceWithSuffix = `${baseName}_Cliente`;
+    
+    // Formatar URL da API Dify
+    let difyApiUrl = config.apiUrl;
+    if (!difyApiUrl.includes('/v1')) {
+      difyApiUrl = difyApiUrl.endsWith('/') ? `${difyApiUrl}v1` : `${difyApiUrl}/v1`;
+    }
+    
+    // Criar URL codificado para o iframe
+    const iframeUrl = `${EVO_API_URL}/manager/embed/dify-setup?` + new URLSearchParams({
+      instance: instanceWithSuffix,
+      apiUrl: difyApiUrl,
+      apiKey: config.apiKey,
+      returnUrl: window.location.href
+    }).toString();
+    
+    console.log(`URL do iframe gerado: ${iframeUrl}`);
+    
+    return iframeUrl;
+  } catch (error) {
+    console.error("Erro ao gerar URL para iframe:", error);
+    throw error;
+  }
+};
+
+// Nova função para configurar webhook diretamente via API com proxy
+export const setupDifyWebhookViaProxy = async (
+  instanceName: string,
+  config: DifyConfig
+): Promise<boolean> => {
+  // Esta função usa um endpoint proxy para configurar o webhook
+  try {
+    // Normalizar o nome da instância
+    const baseName = instanceName.replace("_Cliente", "");
+    const instanceWithSuffix = `${baseName}_Cliente`;
+    
+    // Formatar URL da API Dify
+    let difyApiUrl = config.apiUrl;
+    if (!difyApiUrl.includes('/v1')) {
+      difyApiUrl = difyApiUrl.endsWith('/') ? `${difyApiUrl}v1` : `${difyApiUrl}/v1`;
+    }
+    
+    // Tentar usar um endpoint proxy para configuração
+    const proxyUrl = "https://api.integrador-whatsapp.com/webhook/setup-dify";
+    
+    console.log(`Tentando configurar webhook via proxy: ${proxyUrl}`);
+    
+    const response = await fetch(proxyUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        instanceName: instanceWithSuffix,
+        difyUrl: difyApiUrl,
+        difyApiKey: config.apiKey,
+        apiKey: "29MoyRfK6RM0CWCOXnReOpAj6dIYTt3z" // Chave da Evolution API
+      })
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.text();
+      console.error(`Erro na resposta do proxy (${response.status}):`, errorData);
+      throw new Error(`Erro na API de proxy: ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    console.log("Resposta do proxy:", data);
+    
+    if (data.success) {
+      return true;
+    } else {
+      throw new Error(data.message || "Erro desconhecido no proxy");
+    }
+  } catch (error) {
+    console.error("Erro ao configurar webhook via proxy:", error);
+    return false;
   }
 };
 
