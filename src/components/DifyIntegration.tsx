@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { toast } from "@/components/ui/use-toast";
 import { Input } from "@/components/ui/input";
@@ -114,10 +113,8 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
         throw new Error("Nome da instância não fornecido");
       }
       
-      // Usando o nome da instância com ou sem sufixo _Cliente
-      const fullInstanceName = instanceName.includes("_Cliente") ? instanceName : `${instanceName}_Cliente`;
-      
-      console.log("Iniciando integração com Dify para a instância:", fullInstanceName);
+      console.log(`Iniciando integração com Dify para a instância: ${instanceName}`);
+      console.log(`Status da conexão antes do registro: ${connectionSuccess ? "Conectado" : "Não conectado"}`);
       
       // Configuração do Dify
       const config = {
@@ -138,8 +135,8 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
       console.log("Conexão com Dify estabelecida com sucesso.");
       
       // Registrar o bot Dify na Evolution API
-      console.log("Registrando bot na Evolution API...");
-      await registerDifyBot(fullInstanceName, config);
+      console.log(`Registrando bot Dify para a instância: ${instanceName}`);
+      await registerDifyBot(instanceName, config);
       
       // Configuração já foi salva dentro da função registerDifyBot
       
@@ -152,7 +149,7 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
       console.error("Erro ao realizar integração:", error);
       setRegistrationError(error.message || "Erro desconhecido");
       toast({
-        title: "Erro",
+        title: "Erro na Integração",
         description: error.message || "Houve um erro ao realizar a integração do Dify.",
         variant: "destructive",
       });
