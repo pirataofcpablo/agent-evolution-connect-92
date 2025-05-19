@@ -299,10 +299,12 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
         // Consideramos parcialmente configurado
         setIntegrationComplete(true);
         
+        // Change from "warning" to "default" with customized styling if needed
         toast({
           title: "Integração parcial",
           description: "Configuração salva localmente, mas houve um problema no registro do webhook.",
-          variant: "warning",
+          // Fix: Change "warning" to "default" since "warning" is not a supported variant
+          variant: "default",
         });
       }
     } catch (error: any) {
