@@ -11,7 +11,7 @@ const CatalogPage = () => {
         <CardHeader>
           <CardTitle className="text-2xl font-bold">Meu Catálogo</CardTitle>
           <CardDescription className="text-base mt-2">
-            Tenha sua lojinha ou catalogo virtual em nossas plataformas Multilojas, Para Usuarios do WHATSVENDA a assinatura da lojinha é apenas 5 Reais Mensal ou 50 reais anual assim ajudamos vc a começar com um baixo custo
+            Tenha sua lojinha ou catalogo virtual em nossas plataformas Multilojas, Para Usuarios do WHATSVENDA a mensalidade de um catálogo virtual é apenas R$7,99 ou R$69,99 anual, um valor simbólico para ajudarmos ainda mais nossos clientes.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col md:flex-row gap-4 justify-center">
