@@ -16,7 +16,7 @@ import {
   getInstanceDetails, 
   fetchAllInstances 
 } from '@/services/evoService';
-import { Loader2, Bot, CheckCircle, AlertCircle, InfoIcon, RefreshCw } from "lucide-react";
+import { Loader2, Bot, CheckCircle, AlertCircle, InfoIcon, RefreshCw, ExternalLink } from "lucide-react";
 
 interface DifyIntegrationProps {
   instanceName: string;
@@ -36,6 +36,7 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
   const [instanceStatus, setInstanceStatus] = useState<{exists: boolean, connected: boolean} | null>(null);
   const [instanceDetails, setInstanceDetails] = useState<any>(null);
   const [refreshingStatus, setRefreshingStatus] = useState(false);
+  const [manualWebhookMode, setManualWebhookMode] = useState(false);
   
   // Nova função para verificar status da instância de forma mais robusta
   const verifyInstanceStatus = async () => {
@@ -217,6 +218,10 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
     }
   };
 
+  const handleManualWebhookToggle = () => {
+    setManualWebhookMode(!manualWebhookMode);
+  };
+
   const handleSaveIntegration = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -270,13 +275,36 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
       
       // Registrar o bot Dify na Evolution API
       console.log(`Registrando bot Dify para a instância: ${instanceName}`);
-      await registerDifyBot(instanceName, config);
       
-      setIntegrationComplete(true);
-      toast({
-        title: "Integração realizada",
-        description: "O bot Dify foi integrado com sucesso à instância " + instanceName,
-      });
+      try {
+        await registerDifyBot(instanceName, config);
+        setIntegrationComplete(true);
+        
+        toast({
+          title: "Integração realizada",
+          description: "O bot Dify foi integrado com sucesso à instância " + instanceName,
+        });
+      } catch (webhookError: any) {
+        console.error("Erro específico no registro do webhook:", webhookError);
+        
+        // Salvar configuração local mesmo com erro no webhook
+        saveDifyConfig(instanceName.replace("_Cliente", ""), config);
+        
+        // Mostrar alerta específico de webhook
+        setRegistrationError(`Configuração do Dify foi salva localmente, mas houve um problema no registro do webhook: ${webhookError.message || "Erro desconhecido no webhook"}`);
+        
+        // Mover para modo manual de configuração de webhook
+        setManualWebhookMode(true);
+        
+        // Consideramos parcialmente configurado
+        setIntegrationComplete(true);
+        
+        toast({
+          title: "Integração parcial",
+          description: "Configuração salva localmente, mas houve um problema no registro do webhook.",
+          variant: "warning",
+        });
+      }
     } catch (error: any) {
       console.error("Erro ao realizar integração:", error);
       setRegistrationError(error.message || "Erro desconhecido");
@@ -382,7 +410,42 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
         </div>
       )}
 
-      {integrationComplete && (
+      {/* Mostrar informações adicionais quando houver problemas de webhook */}
+      {manualWebhookMode && (
+        <Alert className="bg-yellow-900/20 border-yellow-500/30 mb-4">
+          <InfoIcon className="h-5 w-5 text-yellow-400" />
+          <AlertTitle className="text-yellow-400">Configuração Manual de Webhook Necessária</AlertTitle>
+          <AlertDescription className="text-gray-300 space-y-2">
+            <p>
+              Devido a limitações na API Evolution, pode ser necessário configurar o webhook do Dify manualmente.
+              A configuração local foi salva e o serviço está parcialmente operacional.
+            </p>
+            <div className="mt-2">
+              <p className="font-semibold">Configuração manual na Evolution API:</p>
+              <ol className="list-decimal list-inside ml-2 mt-1 space-y-1">
+                <li>Acesse o painel da Evolution API</li>
+                <li>Vá para Configurações {'>'} Webhooks</li>
+                <li>Adicione um novo webhook do tipo "Dify IA"</li>
+                <li>Use a mesma API Key e URL configuradas aqui</li>
+                <li>Ative o webhook para a instância {instanceName}</li>
+              </ol>
+            </div>
+            <div className="mt-3 flex">
+              <Button 
+                size="sm" 
+                variant="outline" 
+                className="mt-2 border-yellow-500 text-yellow-400 hover:bg-yellow-500/20"
+                onClick={() => window.open("https://v2.solucoesweb.uk/", "_blank")}
+              >
+                <ExternalLink className="h-4 w-4 mr-2" />
+                Acessar Evolution API
+              </Button>
+            </div>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {integrationComplete && !manualWebhookMode && (
         <Alert className="bg-green-900/20 border-green-500/30">
           <CheckCircle className="h-5 w-5 text-green-400" />
           <AlertTitle className="text-green-400">Integração Completa</AlertTitle>
@@ -516,13 +579,13 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
           </Button>
           <Button 
             type="submit" 
-            disabled={isLoading || integrationComplete || !connectionSuccess || 
+            disabled={isLoading || (integrationComplete && !manualWebhookMode) || !connectionSuccess || 
                      (instanceStatus && (!instanceStatus.exists || !instanceStatus.connected))}
             className="bg-blue-600 hover:bg-blue-700"
           >
             {isLoading ? (
               <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Integrando...</>
-            ) : integrationComplete ? (
+            ) : integrationComplete && !manualWebhookMode ? (
               <><Bot className="mr-2 h-4 w-4" /> Integração Completa</>
             ) : (
               <><Bot className="mr-2 h-4 w-4" /> Integrar com Dify IA</>
