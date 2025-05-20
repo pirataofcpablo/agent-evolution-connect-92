@@ -1,6 +1,6 @@
 
 import { getDifyConfig } from './difyService';
-import { getN8nConfig } from './n8nService';
+import { getN8nConfig, createN8nFlow } from './n8nService';
 import { getTypebotConfig } from './typebotService';
 import { getMercadoPagoConfig } from './mercadoPagoService';
 import { getTelegramConfig, notifyPaymentReceived } from './telegramService';
@@ -113,6 +113,34 @@ export const sendWhatsAppMessage = async (
   }
 };
 
+// Creates a n8n flow for a new instance automatically
+export const setupN8nForNewInstance = async (instanceName: string): Promise<boolean> => {
+  try {
+    console.log(`Configurando n8n automaticamente para a instância ${instanceName}`);
+    
+    // Remove _Cliente suffix if present for base instance name
+    const baseInstanceName = instanceName.replace("_Cliente", "");
+    
+    // Create n8n flow
+    const result = await createN8nFlow({
+      instanceName: baseInstanceName,
+      userName: baseInstanceName,
+      webhookUrl: ""
+    });
+    
+    if (!result.success) {
+      console.error("Falha ao criar fluxo n8n automático");
+      return false;
+    }
+    
+    console.log(`Fluxo n8n criado com sucesso para ${baseInstanceName}`);
+    return true;
+  } catch (error) {
+    console.error("Erro ao configurar n8n:", error);
+    return false;
+  }
+};
+
 // Process incoming message and route to appropriate bot
 export const processIncomingMessage = async (message: WhatsAppMessage): Promise<void> => {
   try {
@@ -150,7 +178,23 @@ export const processIncomingMessage = async (message: WhatsAppMessage): Promise<
       }
     }
     
-    // Check if Dify integration is configured (second priority)
+    // Check if n8n integration is configured (second priority - replaces Dify)
+    const n8nConfig = getN8nConfig(baseInstanceName);
+    if (n8nConfig && n8nConfig.webhookUrl) {
+      try {
+        console.log("Integração n8n encontrada. Processando mensagem...");
+        const sent = await sendMessageToN8n(text, sender, n8nConfig);
+        if (sent) {
+          console.log(`Mensagem encaminhada para n8n: ${text}`);
+          return;
+        }
+      } catch (error) {
+        console.error("Erro ao processar mensagem com n8n:", error);
+        // Continue to Dify as fallback if available
+      }
+    }
+    
+    // Check if Dify integration is configured (third priority after n8n)
     const difyConfig = getDifyConfig(baseInstanceName);
     if (difyConfig) {
       try {
@@ -227,46 +271,26 @@ export const processIncomingMessage = async (message: WhatsAppMessage): Promise<
       }
     }
     
-    // If Typebot and Dify failed or aren't configured, try with N8n
-    const n8nConfig = getN8nConfig(baseInstanceName);
-    if (n8nConfig) {
-      try {
-        console.log("Integração n8n encontrada. Processando mensagem...");
-        const sent = await sendMessageToN8n(text, sender, n8nConfig);
-        if (sent) {
-          console.log(`Mensagem encaminhada para n8n: ${text}`);
-          return;
-        }
-      } catch (error) {
-        console.error("Erro ao processar mensagem com n8n:", error);
-        // Send fallback message
-        await sendWhatsAppMessage(instanceName, sender,
-          "Desculpe, estou com problemas para processar sua mensagem no momento. Tente novamente mais tarde.");
+    // Check if Mercado Pago keywords are mentioned
+    const mercadoPagoKeywords = ['pagamento', 'pago', 'pagar', 'mercado pago', 'assinatura', 'renovar', 'renovação'];
+    const hasMercadoPagoKeyword = mercadoPagoKeywords.some(keyword => 
+      text.toLowerCase().includes(keyword.toLowerCase())
+    );
+    
+    // If payment related, handle with Mercado Pago service
+    if (hasMercadoPagoKeyword) {
+      const mercadoPagoConfig = getMercadoPagoConfig(baseInstanceName);
+      if (mercadoPagoConfig && mercadoPagoConfig.enabled) {
+        console.log("Mensagem relacionada a pagamento detectada. Processando com Mercado Pago...");
+        await sendWhatsAppMessage(instanceName, sender, 
+          "Recebi sua mensagem sobre pagamento. Um de nossos atendentes irá verificar sua situação e entrar em contato em breve.");
+        return;
       }
-    } else {
-      console.log("Nenhuma integração n8n encontrada para", baseInstanceName);
-      
-      // Check if Mercado Pago keywords are mentioned
-      const mercadoPagoKeywords = ['pagamento', 'pago', 'pagar', 'mercado pago', 'assinatura', 'renovar', 'renovação'];
-      const hasMercadoPagoKeyword = mercadoPagoKeywords.some(keyword => 
-        text.toLowerCase().includes(keyword.toLowerCase())
-      );
-      
-      // If payment related, handle with Mercado Pago service
-      if (hasMercadoPagoKeyword) {
-        const mercadoPagoConfig = getMercadoPagoConfig(baseInstanceName);
-        if (mercadoPagoConfig && mercadoPagoConfig.enabled) {
-          console.log("Mensagem relacionada a pagamento detectada. Processando com Mercado Pago...");
-          await sendWhatsAppMessage(instanceName, sender, 
-            "Recebi sua mensagem sobre pagamento. Um de nossos atendentes irá verificar sua situação e entrar em contato em breve.");
-          return;
-        }
-      }
-      
-      // Default fallback response if no integration is available
-      await sendWhatsAppMessage(instanceName, sender,
-        "Olá! No momento estamos sem integrações configuradas para responder automaticamente. Um atendente entrará em contato em breve.");
     }
+    
+    // Default fallback response if no integration is available
+    await sendWhatsAppMessage(instanceName, sender,
+      "Olá! No momento estamos sem integrações configuradas para responder automaticamente. Um atendente entrará em contato em breve.");
   } catch (error) {
     console.error("Erro ao processar mensagem:", error);
   }

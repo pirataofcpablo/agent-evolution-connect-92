@@ -1,6 +1,6 @@
 
 import { useState, useEffect, useRef } from "react";
-import { Book, Frame, Upload, Send, FileText, Image, Video } from "lucide-react";
+import { Book, Frame, Upload, Send, FileText, Image, Video, Bot, Brain, Loader2, AlertTriangle, Check } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,8 +8,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import Header from "@/components/Header";
 import SideNav from "@/components/SideNav";
+import { getN8nConfig, sendKnowledgeToN8nAgent } from "@/services/n8nService";
 
 const IAPersonalityPage = () => {
   // Google Sheets iframe state
@@ -17,13 +19,14 @@ const IAPersonalityPage = () => {
   const [iframeUrl, setIframeUrl] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // N8n webhook state
-  const [webhookUrl, setWebhookUrl] = useState("");
-  const [isWebhookConfigured, setIsWebhookConfigured] = useState(false);
+  // State for n8n integration
+  const [instanceName, setInstanceName] = useState<string>("");
+  const [n8nConfig, setN8nConfig] = useState<any>(null);
   const [text, setText] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isSending, setIsSending] = useState(false);
+  const [isCheckingConfig, setIsCheckingConfig] = useState(true);
 
   // Load saved data on component mount
   useEffect(() => {
@@ -34,12 +37,18 @@ const IAPersonalityPage = () => {
       setIframeUrl(savedUrl);
     }
     
-    // Load webhook URL
-    const savedWebhookUrl = localStorage.getItem('n8nWebhookUrl');
-    if (savedWebhookUrl) {
-      setWebhookUrl(savedWebhookUrl);
-      setIsWebhookConfigured(true);
+    // Get instance name and n8n config
+    const storedInstanceName = localStorage.getItem('instanceName');
+    if (storedInstanceName) {
+      const baseInstanceName = storedInstanceName.replace("_Cliente", "");
+      setInstanceName(baseInstanceName);
+      
+      // Load n8n config for this instance
+      const config = getN8nConfig(baseInstanceName);
+      setN8nConfig(config);
     }
+    
+    setIsCheckingConfig(false);
   }, []);
 
   // Google Sheets iframe handling
@@ -99,51 +108,6 @@ const IAPersonalityPage = () => {
     });
   };
 
-  // N8n webhook configuration
-  const configureWebhook = () => {
-    if (!webhookUrl) {
-      toast({
-        title: "URL necessária",
-        description: "Por favor, insira o link do webhook do n8n.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Validate webhook URL
-    try {
-      new URL(webhookUrl);
-    } catch (e) {
-      toast({
-        title: "URL inválida",
-        description: "Por favor, insira um URL válido para o webhook.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Save webhook URL to localStorage
-    localStorage.setItem('n8nWebhookUrl', webhookUrl);
-    setIsWebhookConfigured(true);
-    
-    toast({
-      title: "Webhook configurado",
-      description: "Seu webhook do n8n foi configurado com sucesso.",
-    });
-  };
-
-  // Reset webhook configuration
-  const resetWebhook = () => {
-    localStorage.removeItem('n8nWebhookUrl');
-    setWebhookUrl("");
-    setIsWebhookConfigured(false);
-    
-    toast({
-      title: "Webhook removido",
-      description: "A configuração do webhook foi removida.",
-    });
-  };
-
   // Handle file selection
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -171,12 +135,12 @@ const IAPersonalityPage = () => {
     else return (size / 1048576).toFixed(1) + " MB";
   };
 
-  // Send data to n8n webhook
-  const sendToWebhook = async () => {
-    if (!isWebhookConfigured) {
+  // Send knowledge to n8n agent
+  const sendKnowledgeToAgent = async () => {
+    if (!instanceName || !n8nConfig || !n8nConfig.webhookUrl) {
       toast({
-        title: "Webhook não configurado",
-        description: "Por favor, configure o webhook do n8n primeiro.",
+        title: "Agente não configurado",
+        description: "Configure seu agente IA na aba Integrar Bots > n8n primeiro.",
         variant: "destructive",
       });
       return;
@@ -194,36 +158,35 @@ const IAPersonalityPage = () => {
     setIsSending(true);
 
     try {
-      const formData = new FormData();
-      formData.append("text", text);
+      // Primeiro enviar o texto se existir
+      if (text) {
+        const textSuccess = await sendKnowledgeToN8nAgent(instanceName, text, 'text');
+        if (!textSuccess) {
+          throw new Error("Falha ao enviar texto");
+        }
+      }
       
-      selectedFiles.forEach((file, index) => {
-        formData.append(`file${index}`, file);
-      });
+      // Depois enviar cada arquivo
+      for (const file of selectedFiles) {
+        const fileSuccess = await sendKnowledgeToN8nAgent(instanceName, file, 'file');
+        if (!fileSuccess) {
+          throw new Error(`Falha ao enviar arquivo: ${file.name}`);
+        }
+      }
 
-      // Retrieve webhook URL from localStorage
-      const savedWebhookUrl = localStorage.getItem('n8nWebhookUrl');
-      
-      // Send data to webhook
-      const response = await fetch(savedWebhookUrl || webhookUrl, {
-        method: "POST",
-        body: formData,
-        mode: "no-cors" // Use no-cors to avoid CORS errors
-      });
-
-      // Clear form after successful submission
+      // Limpar formulário após sucesso
       setText("");
       setSelectedFiles([]);
       
       toast({
-        title: "Enviado com sucesso",
-        description: "Seu conhecimento foi enviado para o webhook do n8n.",
+        title: "Conhecimento enviado",
+        description: "Seu conhecimento foi enviado para o agente IA com sucesso.",
       });
     } catch (error) {
-      console.error("Erro ao enviar dados:", error);
+      console.error("Erro ao enviar conhecimento:", error);
       toast({
         title: "Erro ao enviar",
-        description: "Ocorreu um erro ao enviar os dados para o webhook.",
+        description: "Ocorreu um erro ao enviar conhecimento para o agente IA.",
         variant: "destructive",
       });
     } finally {
@@ -262,57 +225,60 @@ const IAPersonalityPage = () => {
             </TabsList>
             
             <TabsContent value="knowledge">
-              {/* Webhook Configuration Card */}
+              {/* Agent Status Card */}
               <Card className="bg-gray-900 border-gray-800 mb-6">
                 <CardHeader>
-                  <CardTitle>Configuração do Webhook</CardTitle>
+                  <CardTitle className="flex items-center">
+                    <Bot className="mr-2 h-5 w-5 text-blue-500" />
+                    Status do Agente IA
+                  </CardTitle>
                   <CardDescription>
-                    Configure o webhook do n8n para enviar conhecimento para sua IA.
+                    Verifique o status do seu agente IA integrado ao n8n
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {!isWebhookConfigured ? (
-                    <div className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="webhook-url">URL do Webhook do n8n</Label>
-                        <div className="flex space-x-2">
-                          <Input 
-                            id="webhook-url" 
-                            value={webhookUrl} 
-                            onChange={(e) => setWebhookUrl(e.target.value)} 
-                            placeholder="https://n8n.seu-dominio.com/webhook/..."
-                            className="bg-gray-800 border-gray-700 flex-1"
-                          />
-                          <Button 
-                            onClick={configureWebhook}
-                            className="bg-green-600 hover:bg-green-700 whitespace-nowrap"
-                          >
-                            Configurar
-                          </Button>
-                        </div>
-                        <p className="text-sm text-gray-400">
-                          Cole aqui o link do webhook do n8n que receberá os dados de conhecimento.
-                        </p>
-                      </div>
+                  {isCheckingConfig ? (
+                    <div className="flex items-center text-gray-400">
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      Verificando configuração...
                     </div>
+                  ) : n8nConfig && n8nConfig.webhookUrl ? (
+                    <>
+                      <Alert className="bg-green-900/20 border-green-500/30 mb-4">
+                        <Check className="h-5 w-5 text-green-500" />
+                        <AlertTitle className="text-green-500">Agente IA Conectado</AlertTitle>
+                        <AlertDescription className="text-gray-300">
+                          Seu agente está conectado ao n8n e pronto para receber conhecimento.
+                          {n8nConfig.aiModel && (
+                            <span className="block mt-1">
+                              Modelo atual: <strong className="text-blue-400">
+                                {n8nConfig.aiModel === 'groq' ? 'Groq LLM' : 'OpenAI GPT'}
+                              </strong>
+                            </span>
+                          )}
+                        </AlertDescription>
+                      </Alert>
+                      
+                      {!n8nConfig.aiModel && (
+                        <Alert className="bg-yellow-900/20 border-yellow-500/30">
+                          <AlertTriangle className="h-5 w-5 text-yellow-500" />
+                          <AlertTitle className="text-yellow-500">Modelo de IA não selecionado</AlertTitle>
+                          <AlertDescription className="text-gray-300">
+                            Você ainda não selecionou um modelo de IA para seu agente.
+                            Acesse a aba Integrar Bots > n8n > Agente IA para selecionar um modelo.
+                          </AlertDescription>
+                        </Alert>
+                      )}
+                    </>
                   ) : (
-                    <div className="space-y-4">
-                      <div className="p-4 bg-green-900/20 border border-green-700 rounded-lg">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <h3 className="font-medium text-green-400">Webhook Configurado</h3>
-                            <p className="text-sm text-gray-300 truncate max-w-[400px]">{webhookUrl}</p>
-                          </div>
-                          <Button 
-                            variant="outline" 
-                            onClick={resetWebhook}
-                            className="border-red-500 text-red-500 hover:bg-red-900/20"
-                          >
-                            Desconectar
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
+                    <Alert className="bg-yellow-900/20 border-yellow-500/30">
+                      <AlertTriangle className="h-5 w-5 text-yellow-500" />
+                      <AlertTitle className="text-yellow-500">Agente IA não configurado</AlertTitle>
+                      <AlertDescription className="text-gray-300">
+                        Você ainda não configurou seu agente IA. Acesse a aba Integrar Bots > n8n 
+                        para criar e configurar seu agente automaticamente.
+                      </AlertDescription>
+                    </Alert>
                   )}
                 </CardContent>
               </Card>
@@ -320,7 +286,10 @@ const IAPersonalityPage = () => {
               {/* Knowledge Form Card */}
               <Card className="bg-gray-900 border-gray-800">
                 <CardHeader>
-                  <CardTitle>Enviar Conhecimento</CardTitle>
+                  <CardTitle className="flex items-center">
+                    <Brain className="mr-2 h-5 w-5 text-green-500" />
+                    Enviar Conhecimento para o Agente IA
+                  </CardTitle>
                   <CardDescription>
                     Envie texto ou arquivos para alimentar sua IA com conhecimento personalizado.
                   </CardDescription>
@@ -336,6 +305,7 @@ const IAPersonalityPage = () => {
                         onChange={(e) => setText(e.target.value)} 
                         placeholder="Digite o conhecimento que deseja enviar para sua IA..."
                         className="bg-gray-800 border-gray-700 min-h-[150px]"
+                        disabled={!n8nConfig || !n8nConfig.webhookUrl}
                       />
                     </div>
                     
@@ -343,8 +313,12 @@ const IAPersonalityPage = () => {
                     <div className="space-y-2">
                       <Label>Arquivos</Label>
                       <div 
-                        className="border-2 border-dashed border-gray-700 rounded-lg p-6 text-center cursor-pointer hover:bg-gray-800/50 transition-colors"
-                        onClick={triggerFileUpload}
+                        className={`border-2 border-dashed border-gray-700 rounded-lg p-6 text-center ${
+                          (!n8nConfig || !n8nConfig.webhookUrl) 
+                            ? 'opacity-60 cursor-not-allowed'
+                            : 'cursor-pointer hover:bg-gray-800/50'
+                        } transition-colors`}
+                        onClick={(!n8nConfig || !n8nConfig.webhookUrl) ? undefined : triggerFileUpload}
                       >
                         <Upload className="mx-auto h-8 w-8 text-gray-400 mb-2" />
                         <p className="text-sm text-gray-300 font-medium">
@@ -360,6 +334,7 @@ const IAPersonalityPage = () => {
                           className="hidden" 
                           multiple
                           accept=".txt,.pdf,.doc,.docx,image/*,video/*"
+                          disabled={!n8nConfig || !n8nConfig.webhookUrl}
                         />
                       </div>
                     </div>
@@ -395,8 +370,8 @@ const IAPersonalityPage = () => {
                     {/* Submit Button */}
                     <Button
                       className="w-full bg-green-600 hover:bg-green-700"
-                      onClick={sendToWebhook}
-                      disabled={isSending || (!isWebhookConfigured)}
+                      onClick={sendKnowledgeToAgent}
+                      disabled={isSending || !n8nConfig || !n8nConfig.webhookUrl || (!text && selectedFiles.length === 0)}
                     >
                       <Send className="mr-2 h-4 w-4" />
                       {isSending ? "Enviando..." : "Enviar Conhecimento"}
