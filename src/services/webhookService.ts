@@ -4,7 +4,7 @@ import { getN8nConfig } from './n8nService';
 import { getTypebotConfig } from './typebotService';
 import { getMercadoPagoConfig } from './mercadoPagoService';
 import { getTelegramConfig, notifyPaymentReceived } from './telegramService';
-import { sendMessageToDify, buildDifyWebhookPayload } from './difyService';
+import { sendMessageToDify } from './difyService';
 import { sendMessageToN8n } from './n8nService';
 import { sendMessageToTypebot } from './typebotService';
 
