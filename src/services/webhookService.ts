@@ -1,8 +1,11 @@
 
 import { getDifyConfig } from './difyService';
 import { getN8nConfig } from './n8nService';
+import { getTypebotConfig } from './typebotService';
+import { getMercadoPagoConfig } from './mercadoPagoService';
 import { sendMessageToDify } from './difyService';
 import { sendMessageToN8n } from './n8nService';
+import { sendMessageToTypebot } from './typebotService';
 
 // Endpoints for Evolution API
 const EVO_API_KEY = "29MoyRfK6RM0CWCOXnReOpAj6dIYTt3z";
@@ -124,12 +127,33 @@ export const processIncomingMessage = async (message: WhatsAppMessage): Promise<
     // Extract base instance name
     const baseInstanceName = instanceName.replace("_Cliente", "");
     
-    // Check if Dify integration is configured
+    // Check if Typebot integration is configured (first priority)
+    const typebotConfig = getTypebotConfig(baseInstanceName);
+    if (typebotConfig && typebotConfig.enabled) {
+      try {
+        console.log("Integração Typebot encontrada. Processando mensagem...");
+        const response = await sendMessageToTypebot(text, sender, typebotConfig);
+        
+        if (response) {
+          // Send response back to WhatsApp
+          console.log(`Enviando resposta Typebot para ${sender}: "${response}"`);
+          const sent = await sendWhatsAppMessage(instanceName, sender, response);
+          if (sent) {
+            console.log(`Resposta Typebot enviada para ${sender}: "${response}"`);
+            return;
+          }
+        }
+      } catch (error) {
+        console.error("Erro ao processar mensagem com Typebot:", error);
+        // Continue to other services as fallback
+      }
+    }
+    
+    // Check if Dify integration is configured (second priority)
     const difyConfig = getDifyConfig(baseInstanceName);
     if (difyConfig) {
       try {
         console.log("Integração Dify encontrada. Processando mensagem...");
-        // Process message with Dify with error handling
         const response = await sendMessageToDify(text, difyConfig);
         
         if (response) {
@@ -138,38 +162,24 @@ export const processIncomingMessage = async (message: WhatsAppMessage): Promise<
           const sent = await sendWhatsAppMessage(instanceName, sender, response);
           if (sent) {
             console.log(`Resposta Dify enviada para ${sender}: "${response}"`);
-          } else {
-            console.error(`Falha ao enviar resposta Dify para ${sender}`);
+            return;
           }
-        } else {
-          console.error("Resposta vazia do Dify");
-          // Send fallback message
-          await sendWhatsAppMessage(instanceName, sender, 
-            "Desculpe, estou com problemas para processar sua mensagem no momento. Tente novamente mais tarde.");
         }
-        return;
       } catch (error) {
         console.error("Erro ao processar mensagem com Dify:", error);
-        // Try N8n as fallback
+        // Continue to other services as fallback
       }
-    } else {
-      console.log("Nenhuma integração Dify encontrada para", baseInstanceName);
     }
     
-    // If Dify failed or isn't configured, try with N8n
+    // If Typebot and Dify failed or aren't configured, try with N8n
     const n8nConfig = getN8nConfig(baseInstanceName);
     if (n8nConfig) {
       try {
         console.log("Integração n8n encontrada. Processando mensagem...");
-        // Send message to n8n (webhook or API)
         const sent = await sendMessageToN8n(text, sender, n8nConfig);
         if (sent) {
           console.log(`Mensagem encaminhada para n8n: ${text}`);
-        } else {
-          console.error(`Falha ao encaminhar mensagem para n8n: ${text}`);
-          // Send fallback message
-          await sendWhatsAppMessage(instanceName, sender,
-            "Desculpe, estou com problemas para encaminhar sua mensagem no momento. Tente novamente mais tarde.");
+          return;
         }
       } catch (error) {
         console.error("Erro ao processar mensagem com n8n:", error);
@@ -179,9 +189,47 @@ export const processIncomingMessage = async (message: WhatsAppMessage): Promise<
       }
     } else {
       console.log("Nenhuma integração n8n encontrada para", baseInstanceName);
+      
+      // Check if Mercado Pago keywords are mentioned
+      const mercadoPagoKeywords = ['pagamento', 'pago', 'pagar', 'mercado pago', 'assinatura', 'renovar', 'renovação'];
+      const hasMercadoPagoKeyword = mercadoPagoKeywords.some(keyword => 
+        text.toLowerCase().includes(keyword.toLowerCase())
+      );
+      
+      // If payment related, handle with Mercado Pago service
+      if (hasMercadoPagoKeyword) {
+        const mercadoPagoConfig = getMercadoPagoConfig(baseInstanceName);
+        if (mercadoPagoConfig && mercadoPagoConfig.enabled) {
+          console.log("Mensagem relacionada a pagamento detectada. Processando com Mercado Pago...");
+          await sendWhatsAppMessage(instanceName, sender, 
+            "Recebi sua mensagem sobre pagamento. Um de nossos atendentes irá verificar sua situação e entrar em contato em breve.");
+          return;
+        }
+      }
+      
+      // Default fallback response if no integration is available
+      await sendWhatsAppMessage(instanceName, sender,
+        "Olá! No momento estamos sem integrações configuradas para responder automaticamente. Um atendente entrará em contato em breve.");
     }
   } catch (error) {
     console.error("Erro ao processar mensagem:", error);
+  }
+};
+
+// Process payment notifications from Mercado Pago
+export const processPaymentNotification = async (instanceName: string, paymentData: any): Promise<boolean> => {
+  try {
+    console.log(`Processando notificação de pagamento para ${instanceName}:`, paymentData);
+    
+    // Extract base instance name
+    const baseInstanceName = instanceName.replace("_Cliente", "");
+    
+    // Get Mercado Pago configuration
+    const { processPaymentWebhook } = await import('./mercadoPagoService');
+    return await processPaymentWebhook(baseInstanceName, paymentData);
+  } catch (error) {
+    console.error("Erro ao processar notificação de pagamento:", error);
+    return false;
   }
 };
 

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -7,6 +6,8 @@ import { checkInstanceStatus } from '@/services/difyService';
 import { verifyConnectedInstance, getInstanceStatus, fetchAllInstances, getInstanceDetails } from '@/services/evoService';
 import DifyIntegration from './DifyIntegration';
 import N8nIntegration from './N8nIntegration';
+import TypebotIntegration from './TypebotIntegration';
+import MercadoPagoIntegration from './MercadoPagoIntegration';
 import IntegrationCard from './IntegrationCard';
 import { Loader2, RefreshCw, AlertCircle } from 'lucide-react';
 import { Button } from './ui/button';
@@ -274,14 +275,16 @@ const BotIntegration: React.FC<BotIntegrationProps> = ({
         )}
         
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid grid-cols-3 mb-8">
+          <TabsList className="grid grid-cols-5 mb-8">
             <TabsTrigger value="overview">Visão Geral</TabsTrigger>
             <TabsTrigger value="dify">Dify IA</TabsTrigger>
             <TabsTrigger value="n8n">n8n</TabsTrigger>
+            <TabsTrigger value="typebot">Typebot</TabsTrigger>
+            <TabsTrigger value="mercadopago">Mercado Pago</TabsTrigger>
           </TabsList>
           
           <TabsContent value="overview">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6">
               <IntegrationCard 
                 title="Dify IA"
                 description="Plataforma de desenvolvimento de aplicativos de IA conversacional"
@@ -299,6 +302,24 @@ const BotIntegration: React.FC<BotIntegrationProps> = ({
                 buttonText="Configurar n8n"
                 buttonAction={() => setActiveTab("n8n")}
               />
+              
+              <IntegrationCard 
+                title="Typebot"
+                description="Crie fluxos conversacionais avançados e integre com chatbots"
+                icon="💬"
+                color="green"
+                buttonText="Configurar Typebot"
+                buttonAction={() => setActiveTab("typebot")}
+              />
+              
+              <IntegrationCard 
+                title="Mercado Pago"
+                description="Integração de pagamentos e renovação automática de assinaturas"
+                icon="💰"
+                color="yellow"
+                buttonText="Configurar Mercado Pago"
+                buttonAction={() => setActiveTab("mercadopago")}
+              />
             </div>
           </TabsContent>
           
@@ -308,6 +329,14 @@ const BotIntegration: React.FC<BotIntegrationProps> = ({
           
           <TabsContent value="n8n">
             <N8nIntegration instanceName={instanceName} />
+          </TabsContent>
+          
+          <TabsContent value="typebot">
+            <TypebotIntegration instanceName={instanceName} />
+          </TabsContent>
+          
+          <TabsContent value="mercadopago">
+            <MercadoPagoIntegration instanceName={instanceName} />
           </TabsContent>
         </Tabs>
       </CardContent>
