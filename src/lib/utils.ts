@@ -1,4 +1,3 @@
-
 import { type ClassValue, clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
 
@@ -76,4 +75,40 @@ export function base64ToImageFile(base64Data: string, filename: string = 'qrcode
     console.error("Erro ao converter base64 para arquivo:", error);
     return null;
   }
+}
+
+// Format Mercado Pago QR code data for sharing via Telegram
+export function formatQrCodeForTelegram(qrCodeData: string): string {
+  // Check if we have data
+  if (!qrCodeData) return '';
+  
+  // If it's already a URL, return as is
+  if (qrCodeData.startsWith('http')) {
+    return qrCodeData;
+  }
+  
+  // If it's base64 data, keep it as is (Telegram API can handle base64 images)
+  if (qrCodeData.startsWith('data:image')) {
+    return qrCodeData;
+  }
+  
+  // If it's just the QR code content, we need to convert it
+  // This is just a placeholder implementation - usually QR code data from Mercado Pago
+  // would already be properly formatted
+  return `https://chart.googleapis.com/chart?chs=300x300&cht=qr&chl=${encodeURIComponent(qrCodeData)}`;
+}
+
+// Convert payment link to a shareable format (useful for WhatsApp or Telegram)
+export function formatPaymentLink(link: string, includeText: boolean = false): string {
+  if (!link) return '';
+  
+  // Make sure the link is properly formatted
+  const formattedLink = link.startsWith('http') ? link : `https://${link}`;
+  
+  if (!includeText) {
+    return formattedLink;
+  }
+  
+  // Format with text for messaging apps
+  return `Para realizar o pagamento, acesse o link: ${formattedLink}`;
 }

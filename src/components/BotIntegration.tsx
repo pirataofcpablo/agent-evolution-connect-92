@@ -8,6 +8,7 @@ import DifyIntegration from './DifyIntegration';
 import N8nIntegration from './N8nIntegration';
 import TypebotIntegration from './TypebotIntegration';
 import MercadoPagoIntegration from './MercadoPagoIntegration';
+import TelegramIntegration from './TelegramIntegration';
 import IntegrationCard from './IntegrationCard';
 import { Loader2, RefreshCw, AlertCircle } from 'lucide-react';
 import { Button } from './ui/button';
@@ -275,12 +276,13 @@ const BotIntegration: React.FC<BotIntegrationProps> = ({
         )}
         
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid grid-cols-5 mb-8">
+          <TabsList className="grid grid-cols-6 mb-8">
             <TabsTrigger value="overview">Visão Geral</TabsTrigger>
             <TabsTrigger value="dify">Dify IA</TabsTrigger>
             <TabsTrigger value="n8n">n8n</TabsTrigger>
             <TabsTrigger value="typebot">Typebot</TabsTrigger>
             <TabsTrigger value="mercadopago">Mercado Pago</TabsTrigger>
+            <TabsTrigger value="telegram">Telegram</TabsTrigger>
           </TabsList>
           
           <TabsContent value="overview">
@@ -320,6 +322,15 @@ const BotIntegration: React.FC<BotIntegrationProps> = ({
                 buttonText="Configurar Mercado Pago"
                 buttonAction={() => setActiveTab("mercadopago")}
               />
+              
+              <IntegrationCard 
+                title="Telegram"
+                description="Configure bot do Telegram para notificações e renovações automáticas"
+                icon="📱"
+                color="blue"
+                buttonText="Configurar Telegram"
+                buttonAction={() => setActiveTab("telegram")}
+              />
             </div>
           </TabsContent>
           
@@ -337,6 +348,10 @@ const BotIntegration: React.FC<BotIntegrationProps> = ({
           
           <TabsContent value="mercadopago">
             <MercadoPagoIntegration instanceName={instanceName} />
+          </TabsContent>
+          
+          <TabsContent value="telegram">
+            <TelegramIntegration instanceName={instanceName} />
           </TabsContent>
         </Tabs>
       </CardContent>

@@ -1,8 +1,8 @@
-
 import { getDifyConfig } from './difyService';
 import { getN8nConfig } from './n8nService';
 import { getTypebotConfig } from './typebotService';
 import { getMercadoPagoConfig } from './mercadoPagoService';
+import { getTelegramConfig, notifyPaymentReceived } from './telegramService';
 import { sendMessageToDify } from './difyService';
 import { sendMessageToN8n } from './n8nService';
 import { sendMessageToTypebot } from './typebotService';
@@ -226,7 +226,29 @@ export const processPaymentNotification = async (instanceName: string, paymentDa
     
     // Get Mercado Pago configuration
     const { processPaymentWebhook } = await import('./mercadoPagoService');
-    return await processPaymentWebhook(baseInstanceName, paymentData);
+    const success = await processPaymentWebhook(baseInstanceName, paymentData);
+    
+    // If payment was successful and we have client details, send notification to Telegram
+    if (success && paymentData && paymentData.client_info) {
+      const telegramConfig = getTelegramConfig(baseInstanceName);
+      if (telegramConfig && telegramConfig.enabled && telegramConfig.notifyPayment) {
+        try {
+          // Extract client info from payment data
+          const { 
+            client_name = "Cliente", 
+            plan_name = "Plano", 
+            amount = 0 
+          } = paymentData.client_info;
+          
+          // Send notification to Telegram
+          await notifyPaymentReceived(baseInstanceName, client_name, plan_name, Number(amount));
+        } catch (telegramError) {
+          console.error("Erro ao enviar notificação para o Telegram:", telegramError);
+        }
+      }
+    }
+    
+    return success;
   } catch (error) {
     console.error("Erro ao processar notificação de pagamento:", error);
     return false;
