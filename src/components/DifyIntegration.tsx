@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { toast } from "@/components/ui/use-toast";
 import { Input } from "@/components/ui/input";
@@ -16,7 +15,8 @@ import {
   checkInstanceStatus,
   checkExistingWebhooks,
   setupDifyWebhookViaProxy,
-  configureDifyWebhook
+  configureDifyWebhook,
+  buildDifyWebhookPayload
 } from '@/services/difyService';
 import { 
   getInstanceDetails, 
@@ -641,6 +641,30 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
     setN8nWebhookUrl("");
   };
 
+  // Fix for buildDifyWebhookPayload parameters
+  const handleWebhookPayloadExample = () => {
+    try {
+      // Use specific string values for the payload example
+      const messageText = "Exemplo de mensagem";
+      const senderValue = "5511999999999";
+      const instanceValue = instanceName || "instance_name";
+      const timestampValue = new Date().toISOString();
+      
+      // Create payload with these explicit values
+      const examplePayload = buildDifyWebhookPayload(
+        messageText,
+        senderValue,
+        instanceValue,
+        webhookPayloadTemplate
+      );
+      
+      return JSON.stringify(examplePayload, null, 2);
+    } catch (error) {
+      console.error("Erro ao gerar exemplo de payload:", error);
+      return "{ \"error\": \"Não foi possível gerar o exemplo\" }";
+    }
+  };
+
   return (
     <div className="space-y-6">
       <DifySetupIframe
@@ -1009,6 +1033,14 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
                   <p className="text-xs text-gray-400">
                     Template JSON para enviar dados. Use {{message}}, {{sender}}, {{instance}}, {{timestamp}}
                   </p>
+                  
+                  {/* Add example section to show how the payload will look */}
+                  <div className="mt-2 p-2 bg-gray-900 rounded-md border border-gray-700">
+                    <p className="text-xs text-gray-400 mb-1">Exemplo de payload:</p>
+                    <pre className="text-xs text-blue-400 overflow-auto max-h-24">
+                      {handleWebhookPayloadExample()}
+                    </pre>
+                  </div>
                 </div>
                 
                 <Button 
