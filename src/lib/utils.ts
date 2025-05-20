@@ -1,3 +1,4 @@
+
 import { type ClassValue, clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
 
@@ -111,4 +112,10 @@ export function formatPaymentLink(link: string, includeText: boolean = false): s
   
   // Format with text for messaging apps
   return `Para realizar o pagamento, acesse o link: ${formattedLink}`;
+}
+
+// Open Chatwoot in a new window
+export function openChatwoot(): void {
+  const chatwootUrl = "http://app.solucoesweb.uk";
+  window.open(chatwootUrl, "_blank");
 }

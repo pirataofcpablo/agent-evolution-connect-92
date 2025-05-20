@@ -54,6 +54,11 @@ function App() {
             <ChatwootPage />
           </AuthCheck>
         } />
+        <Route path="/crm" element={
+          <AuthCheck>
+            <ChatwootPage />
+          </AuthCheck>
+        } />
         <Route path="/campaigns" element={
           <AuthCheck>
             <CampaignPage />
