@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { Calendar, Plus, Save, Trash2, User } from "lucide-react";
-import { format, parse } from "date-fns";
+import { format } from "date-fns";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
