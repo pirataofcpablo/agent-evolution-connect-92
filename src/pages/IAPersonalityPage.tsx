@@ -265,7 +265,7 @@ const IAPersonalityPage = () => {
                           <AlertTitle className="text-yellow-500">Modelo de IA não selecionado</AlertTitle>
                           <AlertDescription className="text-gray-300">
                             Você ainda não selecionou um modelo de IA para seu agente.
-                            Acesse a aba Integrar Bots > n8n > Agente IA para selecionar um modelo.
+                            Acesse a aba Integrar Bots {'>'}{'>'} n8n {'>'}{'>'} Agente IA para selecionar um modelo.
                           </AlertDescription>
                         </Alert>
                       )}
@@ -275,7 +275,7 @@ const IAPersonalityPage = () => {
                       <AlertTriangle className="h-5 w-5 text-yellow-500" />
                       <AlertTitle className="text-yellow-500">Agente IA não configurado</AlertTitle>
                       <AlertDescription className="text-gray-300">
-                        Você ainda não configurou seu agente IA. Acesse a aba Integrar Bots > n8n 
+                        Você ainda não configurou seu agente IA. Acesse a aba Integrar Bots {'>'}{'>'} n8n 
                         para criar e configurar seu agente automaticamente.
                       </AlertDescription>
                     </Alert>
