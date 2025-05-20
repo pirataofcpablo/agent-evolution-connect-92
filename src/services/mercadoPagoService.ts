@@ -11,6 +11,11 @@ interface MercadoPagoConfig {
   thankYouMessage: string;
 }
 
+interface PaymentResponse {
+  paymentLink: string;
+  qrCodeBase64?: string;
+}
+
 // Get Mercado Pago configuration for a specific instance
 export const getMercadoPagoConfig = (instanceName: string): MercadoPagoConfig | null => {
   try {
@@ -89,14 +94,31 @@ export const testMercadoPagoConnection = async (
   }
 };
 
-// Generate payment link for a subscription renewal
+// Generate QR code image from a string (helper function)
+const generateQRCodeImage = async (data: string): Promise<string> => {
+  try {
+    // This is a simplified simulation since we can't generate actual QR codes without a library
+    // In a real implementation, we would use a QR code generator library
+    
+    // Simulate a base64 encoded QR code image (this is just a placeholder)
+    const simulatedQRBase64 = `data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==`;
+    
+    console.log("QR Code gerado para:", data);
+    return simulatedQRBase64;
+  } catch (error) {
+    console.error("Erro ao gerar QR Code:", error);
+    return "";
+  }
+};
+
+// Generate payment link and QR code for a subscription renewal
 export const generatePaymentLink = async (
   clientId: string,
   clientName: string,
   amount: number,
   description: string,
   config: MercadoPagoConfig
-): Promise<string | null> => {
+): Promise<PaymentResponse | null> => {
   try {
     if (!config.enabled || !config.accessToken) {
       console.log("Integração com Mercado Pago não está habilitada ou configurada corretamente");
@@ -108,15 +130,18 @@ export const generatePaymentLink = async (
     // Simulated payment link - in a real implementation, this would call the Mercado Pago API
     const paymentLink = `https://mpago.la/simulated/${clientId}/${amount}`;
     
-    console.log("Link de pagamento gerado:", paymentLink);
-    return paymentLink;
+    // Generate QR code for the payment link
+    const qrCodeBase64 = await generateQRCodeImage(paymentLink);
+    
+    console.log("Link de pagamento e QR Code gerados:", { paymentLink, qrCodeBase64 });
+    return { paymentLink, qrCodeBase64 };
   } catch (error) {
     console.error("Erro ao gerar link de pagamento:", error);
     return null;
   }
 };
 
-// Send payment reminder to customer with payment link
+// Send payment reminder to customer with payment link and QR code
 export const sendPaymentReminder = async (
   instanceName: string,
   clientId: string,
@@ -132,8 +157,8 @@ export const sendPaymentReminder = async (
       return false;
     }
 
-    // Generate payment link
-    const paymentLink = await generatePaymentLink(
+    // Generate payment link and QR code
+    const paymentData = await generatePaymentLink(
       clientId, 
       clientName, 
       amount, 
@@ -141,7 +166,7 @@ export const sendPaymentReminder = async (
       config
     );
 
-    if (!paymentLink) {
+    if (!paymentData) {
       console.error("Não foi possível gerar o link de pagamento");
       return false;
     }
@@ -150,17 +175,28 @@ export const sendPaymentReminder = async (
     let message = config.reminderMessage;
     message = message.replace(/{nome}/g, clientName);
     message = message.replace(/{dias}/g, daysUntilExpiration.toString());
-    message = message.replace(/{link}/g, paymentLink);
+    message = message.replace(/{link}/g, paymentData.paymentLink);
 
-    // Send WhatsApp message
+    // Send WhatsApp message with text
     const { sendWhatsAppMessage } = await import('./webhookService');
-    const sent = await sendWhatsAppMessage(
+    const textSent = await sendWhatsAppMessage(
       `${instanceName}_Cliente`,
       whatsappNumber,
       message
     );
+    
+    // If QR code is available, send it as an image with caption
+    let qrSent = true;
+    if (paymentData.qrCodeBase64 && textSent) {
+      // In a real implementation, this would send the QR code image via WhatsApp
+      // This is a simulated functionality since we don't have actual WhatsApp image sending
+      console.log(`QR Code seria enviado para ${whatsappNumber}`);
+      
+      // Simulate sending QR code (in real implementation, we would call an API to send image)
+      qrSent = true;
+    }
 
-    return sent;
+    return textSent && qrSent;
   } catch (error) {
     console.error("Erro ao enviar lembrete de pagamento:", error);
     return false;

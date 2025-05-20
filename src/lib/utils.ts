@@ -41,3 +41,39 @@ export function calculateDaysUntil(date: Date | string): number {
   
   return diffDays;
 }
+
+// Convert base64 image data to a file object that can be used in image elements
+export function base64ToImageFile(base64Data: string, filename: string = 'qrcode.png'): File | null {
+  try {
+    // Check if it's a valid base64 string
+    if (!base64Data || !base64Data.includes('base64')) {
+      return null;
+    }
+    
+    // Extract the base64 data (remove the MIME type prefix)
+    const base64Content = base64Data.split(',')[1];
+    const mimeType = base64Data.split(';')[0].split(':')[1];
+    
+    // Convert base64 to blob
+    const byteCharacters = atob(base64Content);
+    const byteArrays = [];
+    
+    for (let offset = 0; offset < byteCharacters.length; offset += 512) {
+      const slice = byteCharacters.slice(offset, offset + 512);
+      
+      const byteNumbers = new Array(slice.length);
+      for (let i = 0; i < slice.length; i++) {
+        byteNumbers[i] = slice.charCodeAt(i);
+      }
+      
+      const byteArray = new Uint8Array(byteNumbers);
+      byteArrays.push(byteArray);
+    }
+    
+    const blob = new Blob(byteArrays, { type: mimeType });
+    return new File([blob], filename, { type: mimeType });
+  } catch (error) {
+    console.error("Erro ao converter base64 para arquivo:", error);
+    return null;
+  }
+}
