@@ -162,12 +162,21 @@ export const processIncomingMessage = async (message: WhatsAppMessage): Promise<
           
           try {
             // Criar payload webhook para n8n
-            const payload = buildDifyWebhookPayload(
-              text,
-              sender,
-              instanceName,
-              difyConfig.webhookPayloadTemplate
-            );
+            const messageText = text;
+            const senderPhone = sender;
+            const instanceNameValue = instanceName;
+            const currentTimestamp = new Date().toISOString();
+            
+            // Substituir placeholders no template de payload
+            let payload = difyConfig.webhookPayloadTemplate || "{}";
+            payload = payload
+              .replace(/{{message}}/g, messageText)
+              .replace(/{{sender}}/g, senderPhone)
+              .replace(/{{instance}}/g, instanceNameValue)
+              .replace(/{{timestamp}}/g, currentTimestamp);
+            
+            // Parse the JSON string to an object
+            const payloadObject = JSON.parse(payload);
             
             // Enviar para o webhook do n8n
             const n8nResponse = await fetch(difyConfig.n8nWebhookUrl, {
@@ -175,7 +184,7 @@ export const processIncomingMessage = async (message: WhatsAppMessage): Promise<
               headers: {
                 'Content-Type': 'application/json'
               },
-              body: JSON.stringify(payload)
+              body: JSON.stringify(payloadObject)
             });
             
             if (n8nResponse.ok) {

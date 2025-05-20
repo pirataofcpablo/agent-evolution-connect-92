@@ -446,7 +446,8 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
           toast({
             title: "Aviso",
             description: "Não foi possível configurar o webhook automaticamente. Você pode precisar configurá-lo manualmente no painel do Dify.",
-            variant: "warning",
+            // Changed from "warning" to "destructive" as only "default" or "destructive" are valid options
+            variant: "destructive",
           });
         }
       }
