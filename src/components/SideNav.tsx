@@ -89,6 +89,13 @@ const SideNav = () => {
             color="#00FF00" // Verde como na imagem
           />
           <NavItem 
+            icon={<Users size={18} />} 
+            label="Clientes" 
+            active={currentPath === "/clients"} 
+            to="/clients"
+            color="#4169E1" // Azul royal para o item Clientes
+          />
+          <NavItem 
             icon={<Calendar size={18} />} 
             label="Campanhas" 
             active={currentPath === "/campaigns"} 
