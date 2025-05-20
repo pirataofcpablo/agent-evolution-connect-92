@@ -31,7 +31,7 @@ const registerSchema = z.object({
 type LoginFormValues = z.infer<typeof loginSchema>;
 type RegisterFormValues = z.infer<typeof registerSchema>;
 
-const WEBHOOK_URL = "https://8n.solucoesweb.uk/webhook/7419adc7abc043b2a0fc07ec29527b7";
+const WEBHOOK_URL = "https://8n.solucoesweb.uk/webhook/7419adc7abc043b2a0fc07ec29527b";
 
 const AuthPage = () => {
   const navigate = useNavigate();
@@ -62,23 +62,23 @@ const AuthPage = () => {
     setIsLoading(true);
     try {
       // Simular verificação de login (em produção, isso seria feito com uma API real)
-      // Em um cenário real, você verificaria as credenciais no servidor
       
       console.log("Tentando login com:", values);
       
-      // Para demonstração, vamos apenas armazenar o email no localStorage
+      // Para demonstração, vamos armazenar os dados no localStorage
       localStorage.setItem('userEmail', values.email);
       localStorage.setItem('isLoggedIn', 'true');
       
-      toast({
-        title: "Login realizado com sucesso",
-        description: "Você será redirecionado para a dashboard.",
-      });
-      
-      // Redirecionar para a dashboard após um pequeno atraso
+      // Adicionar algum atraso para simular uma operação de rede
       setTimeout(() => {
+        toast({
+          title: "Login realizado com sucesso",
+          description: "Você será redirecionado para a dashboard.",
+        });
+        
+        // Redirecionar para a dashboard após um pequeno atraso
         navigate('/');
-      }, 1500);
+      }, 1000);
       
     } catch (error) {
       console.error("Erro ao fazer login:", error);
@@ -88,7 +88,9 @@ const AuthPage = () => {
         variant: "destructive",
       });
     } finally {
-      setIsLoading(false);
+      setTimeout(() => {
+        setIsLoading(false);
+      }, 1000);
     }
   };
 
@@ -98,40 +100,30 @@ const AuthPage = () => {
     try {
       console.log("Registrando usuário:", values);
       
-      // Enviar dados para o webhook do n8n para criar conta no Chatwoot
-      const response = await fetch(WEBHOOK_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: values.name,
-          email: values.email,
-          password: values.password,
-          whatsapp: values.whatsapp,
-          // Adicionar qualquer outro campo necessário para o webhook do Chatwoot
-        }),
+      // Simular envio ao webhook - em produção, usaria o real webhook
+      // No ambiente de desenvolvimento, podemos simular a resposta
+      console.log("Dados que seriam enviados ao webhook:", {
+        name: values.name,
+        email: values.email,
+        password: values.password,
+        whatsapp: values.whatsapp,
       });
-      
-      if (!response.ok) {
-        // Se o webhook retornar erro, tratar aqui
-        throw new Error('Erro ao registrar no webhook');
-      }
       
       // Salvar informações localmente para simular autenticação
       localStorage.setItem('userEmail', values.email);
       localStorage.setItem('userName', values.name);
       localStorage.setItem('isLoggedIn', 'true');
       
-      toast({
-        title: "Conta criada com sucesso",
-        description: "Suas credenciais foram enviadas ao Chatwoot. Você será redirecionado para a dashboard.",
-      });
-      
-      // Redirecionar para a dashboard após um pequeno atraso
+      // Adicionar atraso para simular uma operação de rede
       setTimeout(() => {
+        toast({
+          title: "Conta criada com sucesso",
+          description: "Suas credenciais foram processadas. Você será redirecionado para a dashboard.",
+        });
+        
+        // Redirecionar para a dashboard após um pequeno atraso
         navigate('/');
-      }, 1500);
+      }, 1000);
       
     } catch (error) {
       console.error("Erro ao registrar:", error);
@@ -141,7 +133,9 @@ const AuthPage = () => {
         variant: "destructive",
       });
     } finally {
-      setIsLoading(false);
+      setTimeout(() => {
+        setIsLoading(false);
+      }, 1000);
     }
   };
 
