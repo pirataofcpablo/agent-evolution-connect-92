@@ -7,6 +7,7 @@ import CampaignPage from '@/pages/CampaignPage';
 import IAPersonalityPage from '@/pages/IAPersonalityPage';
 import CatalogPage from '@/pages/CatalogPage';
 import AffiliatePage from '@/pages/AffiliatePage';
+import ClientsPage from '@/pages/ClientsPage';
 
 function App() {
   return (
@@ -19,6 +20,7 @@ function App() {
       <Route path="/ia-personality" element={<IAPersonalityPage />} />
       <Route path="/catalog" element={<CatalogPage />} />
       <Route path="/affiliate" element={<AffiliatePage />} />
+      <Route path="/clients" element={<ClientsPage />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

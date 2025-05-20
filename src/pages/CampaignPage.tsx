@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from 'react';
-import { Calendar, Edit, Trash2 } from "lucide-react";
+import { Calendar, Edit, Trash2, Check } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,9 +13,10 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { cn } from "@/lib/utils";
 import { format, addMinutes } from "date-fns";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
-import { scheduleCampaign, getCampaigns, cancelCampaign } from "@/services/campaignService";
+import { scheduleCampaign, getCampaigns, cancelCampaign, getClientList } from "@/services/campaignService";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface Campaign {
   id: string;
@@ -24,6 +25,13 @@ interface Campaign {
   recipients: string[];
   scheduledAt: string;
   status: string;
+}
+
+interface ClientOption {
+  id: string;
+  name: string;
+  whatsapp: string;
+  selected: boolean;
 }
 
 const CampaignPage = () => {
@@ -35,10 +43,48 @@ const CampaignPage = () => {
   const [scheduledTime, setScheduledTime] = useState(format(addMinutes(new Date(), 2), "HH:mm"));
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loadingCampaigns, setLoadingCampaigns] = useState(false);
+  const [clientOptions, setClientOptions] = useState<ClientOption[]>([]);
+  const [showClientSelect, setShowClientSelect] = useState(false);
+  const [selectAllClients, setSelectAllClients] = useState(false);
 
   useEffect(() => {
     loadCampaigns();
+    loadClients();
   }, []);
+
+  const loadClients = async () => {
+    try {
+      const clients = await getClientList();
+      setClientOptions(clients.map(client => ({
+        ...client,
+        selected: false
+      })));
+    } catch (error) {
+      console.error("Erro ao carregar clientes:", error);
+    }
+  };
+
+  const handleSelectAllClients = (checked: boolean) => {
+    setSelectAllClients(checked);
+    setClientOptions(prev => prev.map(client => ({
+      ...client,
+      selected: checked
+    })));
+  };
+
+  const handleClientToggle = (clientId: string, checked: boolean) => {
+    setClientOptions(prev => {
+      const updated = prev.map(client => 
+        client.id === clientId ? { ...client, selected: checked } : client
+      );
+      
+      // Update selectAll based on whether all clients are selected
+      const allSelected = updated.every(client => client.selected);
+      setSelectAllClients(allSelected);
+      
+      return updated;
+    });
+  };
 
   const loadCampaigns = async () => {
     const instanceName = localStorage.getItem('instanceName');
@@ -104,7 +150,7 @@ const CampaignPage = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!campaignName || !message || !recipients || !scheduledDate) {
+    if (!campaignName || (!recipients && !clientOptions.some(c => c.selected)) || !message || !scheduledDate) {
       toast({
         title: "Campos obrigatórios",
         description: "Por favor, preencha todos os campos obrigatórios.",
@@ -132,8 +178,23 @@ const CampaignPage = () => {
     setLoading(true);
     
     try {
-      // Get recipient list (split by commas and trim whitespace)
-      const recipientList = recipients.split(',').map(r => r.trim());
+      // Get recipient list from selected clients and/or manual input
+      let recipientList: string[] = [];
+      
+      // Add selected clients
+      const selectedClients = clientOptions.filter(c => c.selected);
+      if (selectedClients.length > 0) {
+        recipientList = [...recipientList, ...selectedClients.map(c => c.whatsapp)];
+      }
+      
+      // Add manually entered recipients if any
+      if (recipients.trim()) {
+        const manualRecipients = recipients.split(',').map(r => r.trim());
+        recipientList = [...recipientList, ...manualRecipients];
+      }
+      
+      // Remove duplicates
+      recipientList = [...new Set(recipientList)];
       
       // Get the connected instance name from localStorage
       const instanceName = localStorage.getItem('instanceName');
@@ -167,6 +228,8 @@ const CampaignPage = () => {
         setRecipients("");
         setScheduledDate(new Date());
         setScheduledTime(format(addMinutes(new Date(), 2), "HH:mm"));
+        setClientOptions(prev => prev.map(c => ({ ...c, selected: false })));
+        setSelectAllClients(false);
         
         // Reload campaigns
         loadCampaigns();
@@ -244,18 +307,70 @@ const CampaignPage = () => {
                       />
                     </div>
                     
-                    <div className="space-y-2">
-                      <Label htmlFor="recipients">Destinatários</Label>
-                      <Textarea 
-                        id="recipients" 
-                        value={recipients} 
-                        onChange={(e) => setRecipients(e.target.value)} 
-                        placeholder="Digite os números separados por vírgula (Ex: 5511999999999, 5511888888888)"
-                        className="bg-gray-800 border-gray-700"
-                      />
-                      <p className="text-sm text-gray-400">
-                        Formato: números com código do país sem + ou espaços (Ex: 5511999999999)
-                      </p>
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-center">
+                        <Label>Destinatários</Label>
+                        <Button 
+                          type="button" 
+                          variant="outline" 
+                          onClick={() => setShowClientSelect(!showClientSelect)} 
+                          className="text-xs h-8 bg-gray-800"
+                        >
+                          {showClientSelect ? "Ocultar Clientes" : "Selecionar Clientes"}
+                        </Button>
+                      </div>
+                      
+                      {showClientSelect && (
+                        <Card className="bg-gray-800 border-gray-700 p-4">
+                          <div className="mb-4 flex items-center">
+                            <Checkbox 
+                              id="select-all" 
+                              checked={selectAllClients} 
+                              onCheckedChange={(checked) => handleSelectAllClients(!!checked)} 
+                            />
+                            <Label htmlFor="select-all" className="ml-2 text-sm font-medium">
+                              Selecionar todos
+                            </Label>
+                          </div>
+                          
+                          <div className="max-h-48 overflow-y-auto space-y-2">
+                            {clientOptions.length === 0 ? (
+                              <p className="text-sm text-gray-400">Nenhum cliente cadastrado.</p>
+                            ) : (
+                              clientOptions.map(client => (
+                                <div key={client.id} className="flex items-center">
+                                  <Checkbox 
+                                    id={`client-${client.id}`} 
+                                    checked={client.selected}
+                                    onCheckedChange={(checked) => handleClientToggle(client.id, !!checked)}
+                                  />
+                                  <Label htmlFor={`client-${client.id}`} className="ml-2 text-sm">
+                                    {client.name} ({client.whatsapp})
+                                  </Label>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                          
+                          {clientOptions.some(c => c.selected) && (
+                            <div className="mt-4 text-sm text-gray-400">
+                              Selecionado: {clientOptions.filter(c => c.selected).length} cliente(s)
+                            </div>
+                          )}
+                        </Card>
+                      )}
+                      
+                      <div>
+                        <Textarea 
+                          value={recipients} 
+                          onChange={(e) => setRecipients(e.target.value)} 
+                          placeholder="Adicione números manualmente separados por vírgula (Ex: 5511999999999, 5511888888888)"
+                          className="bg-gray-800 border-gray-700"
+                        />
+                        <p className="text-sm text-gray-400 mt-1">
+                          Formato: números com código do país sem + ou espaços (Ex: 5511999999999)
+                        </p>
+                      </div>
                     </div>
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
