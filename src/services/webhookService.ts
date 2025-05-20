@@ -1,9 +1,10 @@
+
 import { getDifyConfig } from './difyService';
 import { getN8nConfig } from './n8nService';
 import { getTypebotConfig } from './typebotService';
 import { getMercadoPagoConfig } from './mercadoPagoService';
 import { getTelegramConfig, notifyPaymentReceived } from './telegramService';
-import { sendMessageToDify } from './difyService';
+import { sendMessageToDify, buildDifyWebhookPayload } from './difyService';
 import { sendMessageToN8n } from './n8nService';
 import { sendMessageToTypebot } from './typebotService';
 
@@ -154,6 +155,52 @@ export const processIncomingMessage = async (message: WhatsAppMessage): Promise<
     if (difyConfig) {
       try {
         console.log("Integração Dify encontrada. Processando mensagem...");
+        
+        // Verificar se está usando n8n como intermediário
+        if (difyConfig.n8nIntegration && difyConfig.n8nWebhookUrl) {
+          console.log("Usando n8n como intermediário para o Dify");
+          
+          try {
+            // Criar payload webhook para n8n
+            const payload = buildDifyWebhookPayload(
+              text,
+              sender,
+              instanceName,
+              difyConfig.webhookPayloadTemplate
+            );
+            
+            // Enviar para o webhook do n8n
+            const n8nResponse = await fetch(difyConfig.n8nWebhookUrl, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify(payload)
+            });
+            
+            if (n8nResponse.ok) {
+              // Tentar extrair resposta do n8n
+              try {
+                const responseData = await n8nResponse.json();
+                if (responseData && responseData.response) {
+                  console.log(`Enviando resposta n8n para ${sender}: "${responseData.response}"`);
+                  const sent = await sendWhatsAppMessage(instanceName, sender, responseData.response);
+                  if (sent) {
+                    console.log(`Resposta n8n enviada para ${sender}: "${responseData.response}"`);
+                    return;
+                  }
+                }
+              } catch (jsonError) {
+                console.error("Erro ao processar resposta do n8n:", jsonError);
+              }
+            }
+          } catch (n8nError) {
+            console.error("Erro na comunicação com n8n:", n8nError);
+            // Fallback para API Dify direta
+          }
+        }
+        
+        // Comunicação direta com o Dify se n8n falhou ou não está configurado
         const response = await sendMessageToDify(text, difyConfig);
         
         if (response) {

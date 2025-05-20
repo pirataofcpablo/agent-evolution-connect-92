@@ -6,6 +6,8 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Switch } from "@/components/ui/switch";
 import { 
   saveDifyConfig, 
   getDifyConfig, 
@@ -13,24 +15,36 @@ import {
   registerDifyBot, 
   checkInstanceStatus,
   checkExistingWebhooks,
-  setupDifyWebhookViaProxy
+  setupDifyWebhookViaProxy,
+  configureDifyWebhook
 } from '@/services/difyService';
 import { 
   getInstanceDetails, 
   fetchAllInstances 
 } from '@/services/evoService';
-import { Loader2, Bot, CheckCircle, AlertCircle, InfoIcon, RefreshCw, ExternalLink, Copy, RotateCw, Settings } from "lucide-react";
+import { Loader2, Bot, CheckCircle, AlertCircle, InfoIcon, RefreshCw, ExternalLink, Copy, RotateCw, Settings, Webhook, Wrench } from "lucide-react";
 import DifySetupIframe from './DifySetupIframe';
+import { Textarea } from '@/components/ui/textarea';
 
 interface DifyIntegrationProps {
   instanceName: string;
 }
 
 const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
+  // Base configuration state
   const [apiKey, setApiKey] = useState("");
   const [apiUrl, setApiUrl] = useState("https://api.dify.ai/v1");
   const [applicationId, setApplicationId] = useState("");
   const [modelType, setModelType] = useState("chat");
+  
+  // Webhook configuration state
+  const [webhookEnabled, setWebhookEnabled] = useState(false);
+  const [difyWebhookUrl, setDifyWebhookUrl] = useState("");
+  const [webhookSecret, setWebhookSecret] = useState("");
+  const [n8nIntegration, setN8nIntegration] = useState(false);
+  const [n8nWebhookUrl, setN8nWebhookUrl] = useState("");
+  
+  // Operational state
   const [isLoading, setIsLoading] = useState(false);
   const [connectionSuccess, setConnectionSuccess] = useState(false);
   const [integrationComplete, setIntegrationComplete] = useState(false);
@@ -47,6 +61,15 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
   const [processingStatus, setProcessingStatus] = useState<string | null>(null);
   const [showIframe, setShowIframe] = useState(false);
   const [usingProxySetup, setUsingProxySetup] = useState(false);
+  const [activeTab, setActiveTab] = useState("basic");
+  const [webhookPayloadTemplate, setWebhookPayloadTemplate] = useState(
+`{
+  "message": "{{message}}",
+  "sender": "{{sender}}",
+  "instance": "{{instance}}",
+  "timestamp": "{{timestamp}}"
+}`
+  );
   
   // Função para copiar dados para a área de transferência com feedback
   const copyToClipboard = (text: string, label: string) => {
@@ -222,9 +245,17 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
         if (savedConfig) {
           console.log("Configuração Dify encontrada para", normalizedName);
           setApiKey(savedConfig.apiKey);
-          setApiUrl(savedConfig.apiUrl);
-          setApplicationId(savedConfig.applicationId);
-          setModelType(savedConfig.modelType);
+          setApiUrl(savedConfig.apiUrl || "https://api.dify.ai/v1");
+          setApplicationId(savedConfig.applicationId || "");
+          setModelType(savedConfig.modelType || "chat");
+          
+          // Carregar configurações de webhook, se existirem
+          setWebhookEnabled(savedConfig.webhookEnabled || false);
+          setDifyWebhookUrl(savedConfig.difyWebhookUrl || "");
+          setWebhookSecret(savedConfig.webhookSecret || "");
+          setN8nIntegration(savedConfig.n8nIntegration || false);
+          setN8nWebhookUrl(savedConfig.n8nWebhookUrl || "");
+          setWebhookPayloadTemplate(savedConfig.webhookPayloadTemplate || webhookPayloadTemplate);
           
           // Verificar se tem uma integração válida
           const hasValidWebhook = checkWebhooks();
@@ -266,7 +297,13 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
         apiKey,
         apiUrl,
         applicationId,
-        modelType
+        modelType,
+        webhookEnabled,
+        difyWebhookUrl,
+        webhookSecret,
+        n8nIntegration,
+        n8nWebhookUrl,
+        webhookPayloadTemplate
       };
       
       console.log("Testando conexão com Dify...");
@@ -323,21 +360,32 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
         apiKey,
         apiUrl,
         applicationId,
-        modelType
+        modelType,
+        webhookEnabled,
+        difyWebhookUrl,
+        webhookSecret,
+        n8nIntegration,
+        n8nWebhookUrl,
+        webhookPayloadTemplate
       };
       
       const success = await setupDifyWebhookViaProxy(instanceName, config);
       
       if (success) {
         setIntegrationComplete(true);
-        // Fix: Changed from saveDifyConfig(instanceName.replace("_Cliente", ""), config)
-        // to simply pass one argument - the config object with the instanceName included
         saveDifyConfig({
           instanceName: instanceName.replace("_Cliente", ""),
           apiKey,
           apiUrl,
           applicationId,
-          modelType
+          modelType,
+          webhookEnabled,
+          difyWebhookUrl,
+          webhookSecret,
+          n8nIntegration,
+          n8nWebhookUrl,
+          enabled: true,
+          webhookPayloadTemplate
         });
         
         toast({
@@ -361,6 +409,57 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
       });
     } finally {
       setUsingProxySetup(false);
+      setProcessingStatus(null);
+    }
+  };
+
+  const handleConfigureWebhook = async () => {
+    if (!webhookEnabled) return;
+    
+    setIsLoading(true);
+    setProcessingStatus("Configurando webhook do Dify...");
+    
+    try {
+      // Verificar se é necessário configurar o webhook do Dify
+      if (webhookEnabled && difyWebhookUrl) {
+        const config = {
+          apiKey,
+          apiUrl,
+          applicationId,
+          modelType,
+          webhookEnabled,
+          difyWebhookUrl,
+          webhookSecret,
+          n8nIntegration,
+          n8nWebhookUrl,
+          webhookPayloadTemplate
+        };
+        
+        const webhookConfigured = await configureDifyWebhook(config);
+        
+        if (webhookConfigured) {
+          toast({
+            title: "Webhook configurado",
+            description: "O webhook do Dify foi configurado com sucesso.",
+          });
+        } else {
+          toast({
+            title: "Aviso",
+            description: "Não foi possível configurar o webhook automaticamente. Você pode precisar configurá-lo manualmente no painel do Dify.",
+            variant: "warning",
+          });
+        }
+      }
+    } catch (error: any) {
+      console.error("Erro na configuração do webhook:", error);
+      
+      toast({
+        title: "Erro na configuração do webhook",
+        description: error.message || "Não foi possível configurar o webhook do Dify.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
       setProcessingStatus(null);
     }
   };
@@ -406,7 +505,13 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
         apiKey,
         apiUrl,
         applicationId,
-        modelType
+        modelType,
+        webhookEnabled,
+        difyWebhookUrl,
+        webhookSecret,
+        n8nIntegration,
+        n8nWebhookUrl,
+        webhookPayloadTemplate
       };
       
       // Testar conexão antes de prosseguir
@@ -426,14 +531,19 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
       
       if (hasExistingWebhook) {
         console.log("Webhook já configurado, atualizando configuração local");
-        // Fix: Changed from saveDifyConfig(instanceName.replace("_Cliente", ""), config)
-        // to pass a single config object with instanceName included
         saveDifyConfig({
           instanceName: instanceName.replace("_Cliente", ""),
           apiKey,
           apiUrl,
           applicationId,
-          modelType
+          modelType,
+          webhookEnabled,
+          difyWebhookUrl,
+          webhookSecret,
+          n8nIntegration,
+          n8nWebhookUrl,
+          enabled: true,
+          webhookPayloadTemplate
         });
         setIntegrationComplete(true);
         
@@ -441,6 +551,11 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
           title: "Integração atualizada",
           description: "O webhook já estava configurado. Configuração local atualizada.",
         });
+        
+        // Se webhook está ativado, configurá-lo
+        if (webhookEnabled && difyWebhookUrl) {
+          await handleConfigureWebhook();
+        }
         
         return;
       }
@@ -453,6 +568,11 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
         await registerDifyBot(instanceName, config);
         setIntegrationComplete(true);
         
+        // Se webhook está ativado, configurá-lo
+        if (webhookEnabled && difyWebhookUrl) {
+          await handleConfigureWebhook();
+        }
+        
         toast({
           title: "Integração realizada",
           description: "O bot Dify foi integrado com sucesso à instância " + instanceName,
@@ -464,14 +584,19 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
         console.error("Erro específico no registro do webhook:", webhookError);
         
         // Salvar configuração local mesmo com erro no webhook
-        // Fix: Changed from saveDifyConfig(instanceName.replace("_Cliente", ""), config)
-        // to pass a single config object with instanceName included
         saveDifyConfig({
           instanceName: instanceName.replace("_Cliente", ""),
           apiKey,
           apiUrl,
           applicationId,
-          modelType
+          modelType,
+          webhookEnabled,
+          difyWebhookUrl,
+          webhookSecret,
+          n8nIntegration,
+          n8nWebhookUrl,
+          enabled: true,
+          webhookPayloadTemplate
         });
         
         // Mostrar alerta específico de webhook
@@ -509,6 +634,10 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
     setApiUrl("https://api.dify.ai/v1");
     setApplicationId("");
     setModelType("chat");
+    setDifyWebhookUrl("");
+    setWebhookSecret("");
+    setN8nIntegration(false);
+    setN8nWebhookUrl("");
   };
 
   return (
@@ -754,65 +883,198 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
       )}
 
       <form onSubmit={handleSaveIntegration} className="space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="apiKey">API Key do Dify</Label>
-            <Input
-              id="apiKey"
-              type="password"
-              placeholder="Insira sua API Key do Dify"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              className="bg-gray-800 border-gray-700 text-white"
-            />
-            <p className="text-xs text-gray-400">
-              Encontre sua API Key no painel de desenvolvedor do Dify
-            </p>
-          </div>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="w-full grid grid-cols-2">
+            <TabsTrigger value="basic" className="text-sm">Configuração Básica</TabsTrigger>
+            <TabsTrigger value="webhook" className="text-sm">Webhooks & Integrações</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="basic" className="space-y-4 pt-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="apiKey">API Key do Dify</Label>
+                <Input
+                  id="apiKey"
+                  type="password"
+                  placeholder="Insira sua API Key do Dify"
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                  className="bg-gray-800 border-gray-700 text-white"
+                />
+                <p className="text-xs text-gray-400">
+                  Encontre sua API Key no painel de desenvolvedor do Dify
+                </p>
+              </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="apiUrl">API URL</Label>
-            <Input
-              id="apiUrl"
-              placeholder="URL da API (ex: https://api.dify.ai/v1)"
-              value={apiUrl}
-              onChange={(e) => setApiUrl(e.target.value)}
-              className="bg-gray-800 border-gray-700 text-white"
-            />
-            <p className="text-xs text-gray-400">
-              URL base da API do Dify (geralmente termina com /v1)
-            </p>
-          </div>
-        </div>
+              <div className="space-y-2">
+                <Label htmlFor="apiUrl">API URL</Label>
+                <Input
+                  id="apiUrl"
+                  placeholder="URL da API (ex: https://api.dify.ai/v1)"
+                  value={apiUrl}
+                  onChange={(e) => setApiUrl(e.target.value)}
+                  className="bg-gray-800 border-gray-700 text-white"
+                />
+                <p className="text-xs text-gray-400">
+                  URL base da API do Dify (geralmente termina com /v1)
+                </p>
+              </div>
+            </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="applicationId">ID da Aplicação</Label>
-            <Input
-              id="applicationId"
-              placeholder="ID da sua aplicação no Dify"
-              value={applicationId}
-              onChange={(e) => setApplicationId(e.target.value)}
-              className="bg-gray-800 border-gray-700 text-white"
-            />
-          </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="applicationId">ID da Aplicação</Label>
+                <Input
+                  id="applicationId"
+                  placeholder="ID da sua aplicação no Dify"
+                  value={applicationId}
+                  onChange={(e) => setApplicationId(e.target.value)}
+                  className="bg-gray-800 border-gray-700 text-white"
+                />
+              </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="modelType">Tipo de Modelo</Label>
-            <Select 
-              value={modelType} 
-              onValueChange={setModelType}
-            >
-              <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
-                <SelectValue placeholder="Selecione o tipo de modelo" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="chat">Chat</SelectItem>
-                <SelectItem value="text-generation">Geração de Texto</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
+              <div className="space-y-2">
+                <Label htmlFor="modelType">Tipo de Modelo</Label>
+                <Select 
+                  value={modelType} 
+                  onValueChange={setModelType}
+                >
+                  <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
+                    <SelectValue placeholder="Selecione o tipo de modelo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="chat">Chat</SelectItem>
+                    <SelectItem value="text-generation">Geração de Texto</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </TabsContent>
+          
+          <TabsContent value="webhook" className="space-y-6 pt-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-medium text-blue-400">Webhook do Dify</h3>
+                <p className="text-xs text-gray-400 mt-1">
+                  Configure o webhook para o Dify enviar mensagens para outros sistemas
+                </p>
+              </div>
+              <Switch 
+                checked={webhookEnabled} 
+                onCheckedChange={setWebhookEnabled} 
+              />
+            </div>
+            
+            {webhookEnabled && (
+              <div className="pl-4 border-l-2 border-blue-700/40 space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="difyWebhookUrl">URL do Webhook</Label>
+                  <Input
+                    id="difyWebhookUrl"
+                    placeholder="https://seu-webhook.com/endpoint"
+                    value={difyWebhookUrl}
+                    onChange={(e) => setDifyWebhookUrl(e.target.value)}
+                    className="bg-gray-800 border-gray-700 text-white"
+                  />
+                  <p className="text-xs text-gray-400">
+                    URL para onde o Dify enviará as notificações de eventos (respostas da IA)
+                  </p>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="webhookSecret">Segredo do Webhook</Label>
+                  <Input
+                    id="webhookSecret"
+                    type="password"
+                    placeholder="Chave secreta para autenticar webhooks"
+                    value={webhookSecret}
+                    onChange={(e) => setWebhookSecret(e.target.value)}
+                    className="bg-gray-800 border-gray-700 text-white"
+                  />
+                  <p className="text-xs text-gray-400">
+                    Opcional: Uma chave secreta para validar as solicitações do webhook
+                  </p>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="webhookPayloadTemplate">Template do Payload</Label>
+                  <Textarea
+                    id="webhookPayloadTemplate"
+                    placeholder='{"message": "{{message}}", "sender": "{{sender}}"}'
+                    value={webhookPayloadTemplate}
+                    onChange={(e) => setWebhookPayloadTemplate(e.target.value)}
+                    className="bg-gray-800 border-gray-700 text-white h-32 font-mono text-sm"
+                  />
+                  <p className="text-xs text-gray-400">
+                    Template JSON para enviar dados. Use {{message}}, {{sender}}, {{instance}}, {{timestamp}}
+                  </p>
+                </div>
+                
+                <Button 
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleConfigureWebhook}
+                  className="border-blue-600 text-blue-400 hover:bg-blue-900/20"
+                  disabled={isLoading || !difyWebhookUrl}
+                >
+                  {isLoading ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Webhook className="h-4 w-4 mr-2" />
+                  )}
+                  Configurar Webhook
+                </Button>
+              </div>
+            )}
+            
+            <div className="border-t border-gray-800 pt-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-medium text-purple-400">Automação n8n</h3>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Use o n8n como intermediário entre o Dify e a Evolution API
+                  </p>
+                </div>
+                <Switch 
+                  checked={n8nIntegration} 
+                  onCheckedChange={setN8nIntegration} 
+                />
+              </div>
+              
+              {n8nIntegration && (
+                <div className="pl-4 border-l-2 border-purple-700/40 space-y-4 mt-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="n8nWebhookUrl">URL do Webhook n8n</Label>
+                    <Input
+                      id="n8nWebhookUrl"
+                      placeholder="https://seu-n8n.com/webhook/123456"
+                      value={n8nWebhookUrl}
+                      onChange={(e) => setN8nWebhookUrl(e.target.value)}
+                      className="bg-gray-800 border-gray-700 text-white"
+                    />
+                    <p className="text-xs text-gray-400">
+                      URL do nó de webhook no seu fluxo n8n
+                    </p>
+                  </div>
+                  
+                  <Alert className="bg-purple-900/10 border-purple-700/30">
+                    <Wrench className="h-4 w-4 text-purple-400" />
+                    <AlertTitle className="text-purple-400 text-sm">Fluxo Recomendado no n8n</AlertTitle>
+                    <AlertDescription className="text-gray-300 text-xs">
+                      <ul className="list-disc pl-4 mt-1 space-y-1">
+                        <li>Use um nó Webhook para receber dados do Dify</li>
+                        <li>Processe os dados conforme necessário</li>
+                        <li>Faça requisições para a API Evolution usando o nó HTTP</li>
+                        <li>Retorne os resultados formatados para o Dify via API</li>
+                      </ul>
+                    </AlertDescription>
+                  </Alert>
+                </div>
+              )}
+            </div>
+          </TabsContent>
+        </Tabs>
 
         <div className="space-y-2">
           <Label>Configurações da Instância</Label>
@@ -830,7 +1092,9 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
           <InfoIcon className="h-5 w-5 text-yellow-400" />
           <AlertTitle className="text-yellow-400">Dica de Integração</AlertTitle>
           <AlertDescription className="text-gray-300">
-            Certifique-se de que sua API Key do Dify tem permissões de acesso corretas e que sua aplicação está configurada para responder a consultas externas.
+            A integração com webhook permite que o Dify se comunique com outros sistemas, como n8n ou 
+            diretamente com a Evolution API. Configure corretamente o webhook no painel do Dify para 
+            enviar eventos de chat para o endpoint especificado.
           </AlertDescription>
         </Alert>
 
