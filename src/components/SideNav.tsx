@@ -1,7 +1,7 @@
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   Link as LinkIcon,
   Bot,
@@ -46,84 +46,123 @@ const NavItem: React.FC<NavItemProps> = ({ icon, label, active, to, onClick, col
 
 const SideNav = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const currentPath = location.pathname;
+  const [userName, setUserName] = useState<string>("");
+  
+  useEffect(() => {
+    // Obter o nome do usuário salvo no localStorage
+    const storedUserName = localStorage.getItem('userName');
+    if (storedUserName) {
+      setUserName(storedUserName);
+    } else {
+      // Se não tiver nome, usar o email como alternativa
+      const userEmail = localStorage.getItem('userEmail');
+      if (userEmail) {
+        setUserName(userEmail.split('@')[0]); // Usar parte antes do @
+      }
+    }
+  }, []);
   
   const handleLogout = () => {
-    // Clear any stored instance data
+    // Limpar dados de autenticação
+    localStorage.removeItem('isLoggedIn');
+    localStorage.removeItem('userName');
+    localStorage.removeItem('userEmail');
+    
+    // Limpar dados de instância
     localStorage.removeItem('instanceName');
     localStorage.removeItem('instanceStatus');
     
-    // Redirect to home after logout
-    window.location.href = "/";
+    // Redirecionar para a página de autenticação
+    navigate('/auth');
   };
 
   return (
     <aside className="hidden md:block w-64 bg-gray-900 p-4 border-r border-gray-800 h-screen overflow-auto">
       <nav className="h-full flex flex-col justify-between">
-        <ul className="space-y-2">
-          <NavItem 
-            icon={<LinkIcon size={18} />} 
-            label="Conectar" 
-            active={currentPath === "/"} 
-            to="/"
-          />
-          <NavItem 
-            icon={<Bot size={18} />} 
-            label="Integrar Bots" 
-            active={currentPath === "/bots"} 
-            to="/bots" 
-            color="#FF0000" // Vermelho como na imagem
-          />
-          <NavItem 
-            icon={<Activity size={18} />} 
-            label="Status" 
-            active={currentPath === "/status"} 
-            to="/status" 
-            color="#FFFF00" // Amarelo como na imagem
-          />
-          <NavItem 
-            icon={<User size={18} />} 
-            label="Personalidade IA" 
-            active={currentPath === "/ia-personality"} 
-            to="/ia-personality"
-            color="#00FF00" // Verde como na imagem
-          />
-          <NavItem 
-            icon={<Users size={18} />} 
-            label="Clientes" 
-            active={currentPath === "/clients"} 
-            to="/clients"
-            color="#4169E1" // Azul royal para o item Clientes
-          />
-          <NavItem 
-            icon={<Calendar size={18} />} 
-            label="Campanhas" 
-            active={currentPath === "/campaigns"} 
-            to="/campaigns"
-            color="#FFA500" // Laranja como na imagem
-          />
-          <NavItem 
-            icon={<Book size={18} />} 
-            label="Meu Catálogo" 
-            active={currentPath === "/catalog"} 
-            to="/catalog"
-            color="#800080" // Roxo como na imagem
-          />
-          <NavItem 
-            icon={<MessageSquare size={18} />} 
-            label="CRM WHATSAPP" 
-            active={currentPath === "/help"} 
-            to="/help" 
-            color="#FFA500" // Laranja como na imagem
-          />
-          <NavItem 
-            icon={<Users size={18} />} 
-            label="Quero Me Afiliar" 
-            active={currentPath === "/affiliate"} 
-            to="/affiliate"
-            color="#FFFF00" // Amarelo como na imagem
-          />
-        </ul>
+        <div>
+          {/* Logo e informações do usuário */}
+          <div className="mb-6 flex items-center">
+            <img 
+              src="https://whatsvenda.online/img/logologin.png"
+              alt="WhatsVenda Logo" 
+              className="w-10 h-10 mr-3" 
+            />
+            <div>
+              <h3 className="font-semibold text-white">WhatsVenda</h3>
+              {userName && (
+                <p className="text-xs text-gray-400">Olá, {userName}</p>
+              )}
+            </div>
+          </div>
+          
+          {/* Menu de navegação */}
+          <ul className="space-y-2">
+            <NavItem 
+              icon={<LinkIcon size={18} />} 
+              label="Conectar" 
+              active={currentPath === "/"} 
+              to="/"
+            />
+            <NavItem 
+              icon={<Bot size={18} />} 
+              label="Integrar Bots" 
+              active={currentPath === "/bots"} 
+              to="/bots" 
+              color="#FF0000"
+            />
+            <NavItem 
+              icon={<Activity size={18} />} 
+              label="Status" 
+              active={currentPath === "/status"} 
+              to="/status" 
+              color="#FFFF00"
+            />
+            <NavItem 
+              icon={<User size={18} />} 
+              label="Personalidade IA" 
+              active={currentPath === "/ia-personality"} 
+              to="/ia-personality"
+              color="#00FF00"
+            />
+            <NavItem 
+              icon={<Users size={18} />} 
+              label="Clientes" 
+              active={currentPath === "/clients"} 
+              to="/clients"
+              color="#4169E1"
+            />
+            <NavItem 
+              icon={<Calendar size={18} />} 
+              label="Campanhas" 
+              active={currentPath === "/campaigns"} 
+              to="/campaigns"
+              color="#FFA500"
+            />
+            <NavItem 
+              icon={<Book size={18} />} 
+              label="Meu Catálogo" 
+              active={currentPath === "/catalog"} 
+              to="/catalog"
+              color="#800080"
+            />
+            <NavItem 
+              icon={<MessageSquare size={18} />} 
+              label="CRM WHATSAPP" 
+              active={currentPath === "/help"} 
+              to="/help" 
+              color="#FFA500"
+            />
+            <NavItem 
+              icon={<Users size={18} />} 
+              label="Quero Me Afiliar" 
+              active={currentPath === "/affiliate"} 
+              to="/affiliate"
+              color="#FFFF00"
+            />
+          </ul>
+        </div>
         
         <div className="mt-auto">
           <button 
