@@ -133,7 +133,7 @@ export const setupN8nForNewInstance = async (instanceName: string): Promise<bool
       return false;
     }
     
-    console.log(`Fluxo n8n criado com sucesso para ${baseInstanceName}`);
+    console.log(`Fluxo n8n criado com sucesso para ${baseInstanceName} com webhook: ${result.webhookUrl}`);
     return true;
   } catch (error) {
     console.error("Erro ao configurar n8n:", error);

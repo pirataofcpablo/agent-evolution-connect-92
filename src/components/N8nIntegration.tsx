@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { toast } from "@/components/ui/use-toast";
 import { Input } from "@/components/ui/input";
@@ -72,6 +71,63 @@ const N8nIntegration: React.FC<N8nIntegrationProps> = ({ instanceName }) => {
     });
   }, [instanceName]);
 
+  // Função para criar o fluxo automático no n8n
+  const handleCreateFlow = async () => {
+    setIsLoading(true);
+    console.log(`Attempting to create automatic flow for ${instanceName}`);
+    
+    try {
+      const result = await createN8nFlow({
+        instanceName,
+        userName: instanceName,
+        webhookUrl: ""
+      });
+      
+      if (result.success && result.webhookUrl) {
+        setWebhookUrl(result.webhookUrl);
+        setFlowExists(true);
+        setEnableWebhook(true);
+        
+        console.log("Flow created successfully, saving config with webhook URL:", result.webhookUrl);
+        
+        // Save the n8n config with the new webhook URL
+        saveN8nConfig(instanceName, {
+          webhookUrl: result.webhookUrl,
+          apiKey,
+          n8nUrl,
+          enableWebhook: true,
+          enableApi,
+          aiModel: selectedAiModel,
+          aiApiKey: selectedAiModel === 'groq' ? groqApiKey : openAiApiKey
+        });
+        
+        toast({
+          title: "Fluxo criado com sucesso",
+          description: "Um novo fluxo no n8n foi criado para " + instanceName,
+        });
+        
+        // Switch to the AI tab after successful flow creation
+        setActiveTab("ai");
+      } else {
+        console.error("Failed to create flow, response:", result);
+        toast({
+          title: "Erro",
+          description: "Não foi possível criar o fluxo no n8n. Tente novamente.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Error creating flow:", error);
+      toast({
+        title: "Erro",
+        description: "Houve um erro ao criar o fluxo no n8n: " + (error instanceof Error ? error.message : String(error)),
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleSaveIntegration = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -123,53 +179,6 @@ const N8nIntegration: React.FC<N8nIntegrationProps> = ({ instanceName }) => {
     }
   };
   
-  const handleCreateFlow = async () => {
-    setIsLoading(true);
-    try {
-      const result = await createN8nFlow({
-        instanceName,
-        userName: instanceName,
-        webhookUrl: ""
-      });
-      
-      if (result.success && result.webhookUrl) {
-        setWebhookUrl(result.webhookUrl);
-        setFlowExists(true);
-        setEnableWebhook(true);
-        
-        saveN8nConfig(instanceName, {
-          webhookUrl: result.webhookUrl,
-          apiKey,
-          n8nUrl,
-          enableWebhook: true,
-          enableApi,
-          aiModel: selectedAiModel,
-          aiApiKey: selectedAiModel === 'groq' ? groqApiKey : openAiApiKey
-        });
-        
-        toast({
-          title: "Fluxo criado com sucesso",
-          description: "Um novo fluxo no n8n foi criado para " + instanceName,
-        });
-      } else {
-        toast({
-          title: "Erro",
-          description: "Não foi possível criar o fluxo no n8n.",
-          variant: "destructive",
-        });
-      }
-    } catch (error) {
-      console.error("Erro ao criar fluxo:", error);
-      toast({
-        title: "Erro",
-        description: "Houve um erro ao criar o fluxo no n8n.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const handleSaveAiConfig = async (model: 'groq' | 'openai') => {
     setIsAiConfiguring(true);
     

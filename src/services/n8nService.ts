@@ -67,8 +67,12 @@ export const createN8nFlow = async (userData: {
   webhookUrl: string;
 }): Promise<{ success: boolean; webhookUrl?: string }> => {
   try {
+    console.log("Creating n8n flow for instance:", userData.instanceName);
     const n8nApiUrl = "https://n8n.whatsvenda.com/api/v1/workflows";
     const n8nApiKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI5YTViZTBlMC0wMWRjLTQ0ZGMtYTQxNy1kMzQ2ZTYzYjc1N2MiLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwiaWF0IjoxNzQ3NzI3NDE0fQ.9Q-wwkTsMcUjHylJTZ5ibpMZNkkOWV21CJ3m4KR114A";
+    
+    // Sanitize instance name for path (remove special characters and convert to lowercase)
+    const sanitizedPath = userData.instanceName.toLowerCase().replace(/[^a-z0-9]/g, '-');
     
     // Criando um fluxo simples com um webhook de entrada e um nó de IA
     const newWorkflow = {
@@ -78,7 +82,7 @@ export const createN8nFlow = async (userData: {
         {
           parameters: {
             httpMethod: "POST",
-            path: userData.instanceName.toLowerCase().replace(/[^a-z0-9]/g, '-'),
+            path: sanitizedPath,
             options: {},
             responseMode: "lastNode",
             responseData: "firstEntryJson"
@@ -146,6 +150,7 @@ export const createN8nFlow = async (userData: {
       }
     };
 
+    console.log("Sending request to create n8n flow");
     const response = await fetch(n8nApiUrl, {
       method: 'POST',
       headers: {
@@ -156,15 +161,16 @@ export const createN8nFlow = async (userData: {
     });
 
     if (!response.ok) {
-      console.error(`Erro ao criar fluxo n8n: ${response.status}`);
+      const errorData = await response.text();
+      console.error(`Failed to create n8n flow: ${response.status} - ${errorData}`);
       return { success: false };
     }
-
+    
     const data = await response.json();
-    console.log("Fluxo n8n criado com sucesso:", data);
+    console.log("n8n flow created successfully:", data);
     
     // Construir a URL do webhook para o cliente
-    const webhookUrl = `https://n8n.whatsvenda.com/webhook/${userData.instanceName.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
+    const webhookUrl = `https://n8n.whatsvenda.com/webhook/${sanitizedPath}`;
     
     // Salvar a configuração inicial do n8n
     saveN8nConfig(userData.instanceName, {
@@ -179,7 +185,7 @@ export const createN8nFlow = async (userData: {
       webhookUrl 
     };
   } catch (error) {
-    console.error("Erro ao criar fluxo n8n:", error);
+    console.error("Error creating n8n flow:", error);
     return { success: false };
   }
 };
