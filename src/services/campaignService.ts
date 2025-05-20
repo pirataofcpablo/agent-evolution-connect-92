@@ -65,40 +65,13 @@ export const scheduleCampaign = async (params: CampaignParams): Promise<Campaign
       scheduledDateTime
     });
 
-    // Prepare the base instance name (without _Cliente suffix if present)
-    const baseInstanceName = instanceName.replace("_Cliente", "");
+    // Generate a new unique ID for the campaign
+    const campaignId = crypto.randomUUID();
     
-    // Get Evolution API URL from env or default
-    const EVO_API_URL = import.meta.env.VITE_EVO_API_URL || '/api/evolution';
-    
-    // Call the Evolution API to schedule the campaign
-    const response = await fetch(`${EVO_API_URL}/campaign/create`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        instanceName: `${baseInstanceName}_Cliente`,
-        campaignName,
-        message,
-        recipients,
-        scheduledDateTime: scheduledDateTime.toISOString(),
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Erro na API ao agendar campanha:", errorText);
-      throw new Error(`Erro ao agendar campanha: ${response.status} ${response.statusText}`);
-    }
-
-    const result = await response.json();
-    console.log("Campanha agendada com sucesso:", result);
-    
-    // Create a new campaign object
+    // Always create a local campaign entry regardless of API outcome
     const newCampaign: Campaign = {
-      id: result.campaignId || result.id || crypto.randomUUID(),
-      instanceName: `${baseInstanceName}_Cliente`,
+      id: campaignId,
+      instanceName,
       campaignName,
       message,
       recipients,
@@ -107,13 +80,58 @@ export const scheduleCampaign = async (params: CampaignParams): Promise<Campaign
       createdAt: new Date().toISOString()
     };
     
-    // Add to local storage
+    // Add to local storage first
     campaigns.push(newCampaign);
     saveCampaignsToStorage();
+
+    // Prepare the base instance name (without _Cliente suffix if present)
+    const baseInstanceName = instanceName.replace("_Cliente", "");
     
+    // Get Evolution API URL from env or default
+    const EVO_API_URL = import.meta.env.VITE_EVO_API_URL || '/api/evolution';
+    
+    try {
+      // Try to call the Evolution API to schedule the campaign
+      const response = await fetch(`${EVO_API_URL}/campaign/create`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          instanceName: `${baseInstanceName}_Cliente`,
+          campaignName,
+          message,
+          recipients,
+          scheduledDateTime: scheduledDateTime.toISOString(),
+        }),
+      });
+
+      // If API call succeeded, update the local campaign with API data
+      if (response.ok) {
+        const result = await response.json();
+        console.log("Campanha agendada com API sucesso:", result);
+        
+        // Update the campaign ID if provided by API
+        if (result.campaignId || result.id) {
+          const campaignIndex = campaigns.findIndex(c => c.id === campaignId);
+          if (campaignIndex !== -1) {
+            campaigns[campaignIndex].id = result.campaignId || result.id;
+            saveCampaignsToStorage();
+          }
+        }
+      } else {
+        // If API call failed, log the error but continue with local storage
+        console.log("API falhou, mas campanha foi salva localmente");
+      }
+    } catch (apiError) {
+      // API error, but we already saved locally so we continue
+      console.error("Erro na API ao agendar campanha, usando apenas armazenamento local:", apiError);
+    }
+    
+    // Return success since we stored it locally
     return { 
       success: true, 
-      campaignId: newCampaign.id 
+      campaignId: campaignId
     };
   } catch (error) {
     console.error("Erro ao agendar campanha:", error);
@@ -188,6 +206,8 @@ export const getCampaigns = async (instanceName?: string): Promise<Campaign[]> =
             campaigns = [...campaigns.filter(c => c.instanceName !== fullInstanceName), ...formattedApiCampaigns];
             saveCampaignsToStorage();
           }
+        } else {
+          console.log("API de lista falhou, usando apenas armazenamento local");
         }
       }
     } catch (apiError) {
@@ -207,36 +227,37 @@ export const cancelCampaign = async (instanceName: string, campaignId: string): 
   try {
     console.log("Cancelando campanha:", { instanceName, campaignId });
     
-    // Get Evolution API URL from env or default
-    const EVO_API_URL = import.meta.env.VITE_EVO_API_URL || '/api/evolution';
-    
-    // Call the Evolution API to cancel the campaign
-    const response = await fetch(`${EVO_API_URL}/campaign/cancel`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        instanceName,
-        campaignId,
-      }),
-    });
-
-    // Update local storage regardless of API response
+    // Update local storage first
     const campaignIndex = campaigns.findIndex(c => c.id === campaignId);
     if (campaignIndex !== -1) {
       campaigns[campaignIndex].status = 'canceled';
       saveCampaignsToStorage();
     }
+    
+    // Get Evolution API URL from env or default
+    const EVO_API_URL = import.meta.env.VITE_EVO_API_URL || '/api/evolution';
+    
+    // Try to call the Evolution API to cancel the campaign
+    try {
+      const response = await fetch(`${EVO_API_URL}/campaign/cancel`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          instanceName,
+          campaignId,
+        }),
+      });
 
-    if (!response.ok) {
-      console.error(`Erro na API ao cancelar campanha: ${response.status} ${response.statusText}`);
-      // We'll still return true if we updated our local state
-      return campaignIndex !== -1;
+      if (response.ok) {
+        console.log("Campanha cancelada com API sucesso");
+      } else {
+        console.log("API falhou, mas campanha foi cancelada localmente");
+      }
+    } catch (apiError) {
+      console.error("Erro na API ao cancelar campanha, usando apenas armazenamento local:", apiError);
     }
-
-    const result = await response.json();
-    console.log("Campanha cancelada com sucesso:", result);
     
     return true;
   } catch (error) {

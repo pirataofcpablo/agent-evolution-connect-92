@@ -1,5 +1,6 @@
 
 import { Route, Routes } from 'react-router-dom';
+import { useEffect } from 'react';
 import Index from '@/pages/Index';
 import NotFound from '@/pages/NotFound';
 import ChatwootPage from '@/pages/ChatwootPage';
@@ -13,6 +14,13 @@ import AuthCheck from '@/components/AuthCheck';
 import { Toaster } from "@/components/ui/toaster";
 
 function App() {
+  useEffect(() => {
+    // Set default API URL in environment variable
+    if (!import.meta.env.VITE_EVO_API_URL) {
+      (window as any).VITE_EVO_API_URL = '/api/evolution';
+    }
+  }, []);
+  
   return (
     <>
       <Routes>

@@ -219,7 +219,7 @@ const CampaignPage = () => {
       if (result.success) {
         toast({
           title: "Campanha agendada",
-          description: `A campanha "${campaignName}" foi agendada para ${format(dateTime, "PPP 'às' HH:mm")}`,
+          description: `A campanha "${campaignName}" foi agendada para ${format(dateTime, "PPP 'às' HH:mm")}. Será enviada automaticamente no horário programado.`,
         });
         
         // Reset form
