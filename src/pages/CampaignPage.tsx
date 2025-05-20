@@ -13,7 +13,13 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { cn } from "@/lib/utils";
 import { format, addMinutes } from "date-fns";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
-import { scheduleCampaign, getCampaigns, cancelCampaign, getClientList } from "@/services/campaignService";
+import { 
+  scheduleCampaign, 
+  getCampaigns, 
+  cancelCampaign, 
+  getClientList,
+  type Campaign 
+} from "@/services/campaignService";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
