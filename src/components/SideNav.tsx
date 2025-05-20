@@ -11,7 +11,8 @@ import {
   Book,
   MessageSquare,
   Users,
-  LogOut
+  LogOut,
+  CreditCard
 } from "lucide-react";
 
 interface NavItemProps {
@@ -118,6 +119,13 @@ const SideNav = () => {
               active={currentPath === "/status"} 
               to="/status" 
               color="#FFFF00"
+            />
+            <NavItem 
+              icon={<CreditCard size={18} />} 
+              label="Gestor Pix" 
+              active={currentPath === "/gestor-pix"} 
+              to="/gestor-pix"
+              color="#00BFFF"
             />
             <NavItem 
               icon={<User size={18} />} 

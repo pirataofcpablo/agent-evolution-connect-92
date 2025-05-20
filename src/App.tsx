@@ -10,6 +10,7 @@ import CatalogPage from '@/pages/CatalogPage';
 import AffiliatePage from '@/pages/AffiliatePage';
 import ClientsPage from '@/pages/ClientsPage';
 import AuthPage from '@/pages/AuthPage';
+import GestorPixPage from '@/pages/GestorPixPage';
 import AuthCheck from '@/components/AuthCheck';
 import { Toaster } from "@/components/ui/toaster";
 
@@ -41,6 +42,11 @@ function App() {
         <Route path="/status" element={
           <AuthCheck>
             <Index />
+          </AuthCheck>
+        } />
+        <Route path="/gestor-pix" element={
+          <AuthCheck>
+            <GestorPixPage />
           </AuthCheck>
         } />
         <Route path="/help" element={
