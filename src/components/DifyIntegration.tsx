@@ -72,7 +72,7 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
         n8nIntegration,
         n8nWebhookUrl,
         webhookPayloadTemplate,
-        apiKey: difyApiKey // Adding apiKey as required by DifyConfig
+        apiKey: difyApiKey
       });
 
       toast({
