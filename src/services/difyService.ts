@@ -1,4 +1,3 @@
-
 // API Evo service for WhatsApp connection
 
 interface DifyConfig {
@@ -349,7 +348,7 @@ export const unregisterDifyBot = async (instanceName: string) => {
   }
 };
 
-export const checkInstanceStatus = async (instanceName: string) => {
+export const checkInstanceStatus = async (instanceName: string): Promise<string | { exists: boolean; connected: boolean }> => {
   try {
     const EVO_API_URL = import.meta.env.VITE_EVO_API_URL || '/api/evolution';
     console.log(`Verificando status da instância: ${instanceName}`);

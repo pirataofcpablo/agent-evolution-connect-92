@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { toast } from "@/components/ui/use-toast";
 import { Input } from "@/components/ui/input";
@@ -40,7 +41,7 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
     const savedConfig = getDifyConfig(instanceName);
     if (savedConfig) {
       setDifyApiKey(savedConfig.difyApiKey || "");
-      setDifyApiUrl(savedConfig.difyApiUrl || "");
+      setDifyApiUrl(savedConfig.difyUrl || "");
       setEnabled(savedConfig.enabled);
       setN8nIntegration(savedConfig.n8nIntegration || false);
       setN8nWebhookUrl(savedConfig.n8nWebhookUrl || "");
@@ -63,9 +64,10 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
     setIsLoading(true);
 
     try {
-      saveDifyConfig(instanceName, {
+      saveDifyConfig({
+        instanceName,
         difyApiKey,
-        difyApiUrl,
+        difyUrl: difyApiUrl,
         enabled,
         n8nIntegration,
         n8nWebhookUrl,
@@ -91,11 +93,16 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
   const handleCheckInstanceStatus = async () => {
     setCheckingStatus(true);
     try {
-      const status = await checkInstanceStatus(difyApiUrl, difyApiKey);
-      setInstanceStatus(status);
+      const status = await checkInstanceStatus(instanceName);
+      if (typeof status === 'string') {
+        setInstanceStatus(status);
+      } else if (status && typeof status === 'object') {
+        setInstanceStatus(status.connected ? 'connected' : 'disconnected');
+      }
+      
       toast({
         title: "Status da instância",
-        description: `A instância do Dify está ${status}`,
+        description: `A instância do Dify está ${instanceStatus || 'verificada'}`,
       });
     } catch (error) {
       console.error("Erro ao verificar status da instância:", error);
