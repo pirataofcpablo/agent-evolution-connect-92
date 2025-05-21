@@ -42,7 +42,7 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
     if (savedConfig) {
       setDifyApiKey(savedConfig.difyApiKey || "");
       setDifyApiUrl(savedConfig.difyUrl || "");
-      setEnabled(savedConfig.enabled);
+      setEnabled(savedConfig.enabled || false);
       setN8nIntegration(savedConfig.n8nIntegration || false);
       setN8nWebhookUrl(savedConfig.n8nWebhookUrl || "");
       setWebhookPayloadTemplate(savedConfig.webhookPayloadTemplate || '{"message": "{{message}}", "sender": "{{sender}}", "instance": "{{instance}}", "timestamp": "{{timestamp}}"}');
