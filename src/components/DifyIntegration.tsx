@@ -128,14 +128,14 @@ const DifyIntegration: React.FC<DifyIntegrationProps> = ({ instanceName }) => {
     let template = webhookPayloadTemplate || '{"message": "{{message}}", "sender": "{{sender}}", "instance": "{{instance}}", "timestamp": "{{timestamp}}"}';
     
     // Replace placeholders with actual values
-    template = template
+    const processedTemplate = template
       .replace(/{{message}}/g, messageText)
       .replace(/{{sender}}/g, senderPhone)
       .replace(/{{instance}}/g, instanceNameValue)
       .replace(/{{timestamp}}/g, currentTimestamp);
     
     try {
-      const jsonObject = JSON.parse(template);
+      const jsonObject = JSON.parse(processedTemplate);
       setWebhookPayloadExample(JSON.stringify(jsonObject, null, 2));
     } catch (error) {
       console.error("Error parsing webhook template:", error);
