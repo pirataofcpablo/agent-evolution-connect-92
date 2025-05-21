@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "@/components/ui/use-toast";
@@ -28,6 +27,7 @@ const BotStatus: React.FC<BotStatusProps> = ({ instanceName }) => {
       // Remover o sufixo "_Cliente" do nome da instância para verificar as configurações
       const baseInstanceName = instanceName.replace("_Cliente", "");
       
+      // Pass the instance name to getDifyConfig
       const difyConfig = getDifyConfig(baseInstanceName);
       const n8nConfig = getN8nConfig(baseInstanceName);
       

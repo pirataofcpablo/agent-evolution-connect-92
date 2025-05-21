@@ -1,11 +1,13 @@
 
-// Este arquivo foi removido para resolver problemas de compatibilidade.
-// Funções básicas movidas para webhookService.ts
+// Este arquivo foi simplificado para resolver problemas de compatibilidade.
+// As funções básicas foram movidas para webhookService.ts
+
 export const buildDifyWebhookPayload = () => {
   return {};
 };
 
-export const getDifyConfig = () => {
+export const getDifyConfig = (instanceName?: string) => {
+  // Return null since Dify integration has been removed
   return null;
 };
 

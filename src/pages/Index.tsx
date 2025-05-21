@@ -72,7 +72,7 @@ const Index = () => {
                 localStorage.setItem('instanceName', instName);
                 localStorage.setItem('instanceStatus', status || 'Connected');
                 
-                // Check if there are Dify and n8n configurations
+                // Pass the instance name to getDifyConfig
                 try {
                   const difyConfig = getDifyConfig(baseInstanceName);
                   const n8nConfig = getN8nConfig(baseInstanceName);
@@ -140,7 +140,7 @@ const Index = () => {
             console.log("Detalhes completos da instância:", instanceDetails);
           }
           
-          // Check if there are Dify and n8n configurations
+          // Pass the instance name to getDifyConfig
           try {
             const difyConfig = getDifyConfig(baseInstanceName);
             const n8nConfig = getN8nConfig(baseInstanceName);
@@ -210,7 +210,7 @@ const Index = () => {
           setInstanceName(baseInstanceName);
           console.log("Instância conectada pelo localStorage:", baseInstanceName);
           
-          // Check if there are Dify and n8n configurations
+          // Pass the instance name to getDifyConfig
           const difyConfig = getDifyConfig(baseInstanceName);
           const n8nConfig = getN8nConfig(baseInstanceName);
           
