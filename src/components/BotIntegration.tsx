@@ -3,9 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/components/ui/use-toast";
-import { checkInstanceStatus } from '@/services/difyService';
 import { verifyConnectedInstance, getInstanceStatus, fetchAllInstances, getInstanceDetails } from '@/services/evoService';
-import DifyIntegration from './DifyIntegration';
 import N8nIntegration from './N8nIntegration';
 import TypebotIntegration from './TypebotIntegration';
 import MercadoPagoIntegration from './MercadoPagoIntegration';
@@ -202,7 +200,7 @@ const BotIntegration: React.FC<BotIntegrationProps> = ({
         <CardHeader>
           <CardTitle className="text-xl text-blue-400">Integração de Bots</CardTitle>
           <CardDescription className="text-gray-400">
-            Integre bots Dify e n8n ao seu sistema
+            Integre bots ao seu sistema de WhatsApp
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -323,10 +321,6 @@ const BotIntegration: React.FC<BotIntegrationProps> = ({
                 buttonAction={() => setActiveTab("telegram")}
               />
             </div>
-          </TabsContent>
-          
-          <TabsContent value="dify">
-            <DifyIntegration instanceName={instanceName} />
           </TabsContent>
           
           <TabsContent value="n8n">

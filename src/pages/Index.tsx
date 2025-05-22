@@ -10,7 +10,6 @@ import WhatsAppConnection from "@/components/WhatsAppConnection";
 import BotStatus from "@/components/BotStatus";
 import AuthCheck from "@/components/AuthCheck";
 import { toast } from "@/components/ui/use-toast";
-import { getDifyConfig } from '@/services/difyService';
 import { getN8nConfig } from '@/services/n8nService';
 import { verifyConnectedInstance, fetchAllInstances, getInstanceDetails } from '@/services/evoService';
 
@@ -18,7 +17,6 @@ const Index = () => {
   const location = useLocation();
   const [instanceConnected, setInstanceConnected] = useState(false);
   const [instanceName, setInstanceName] = useState("");
-  const [difyConfigured, setDifyConfigured] = useState(false);
   const [n8nConfigured, setN8nConfigured] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -73,14 +71,12 @@ const Index = () => {
                 localStorage.setItem('instanceName', instName);
                 localStorage.setItem('instanceStatus', status || 'Connected');
                 
-                // Verificar apenas n8n e deixar dify como false
+                // Verificar apenas n8n
                 try {
-                  // Dify integration is always null or false now
                   const n8nConfig = getN8nConfig(baseInstanceName);
                   
                   console.log("n8n config:", n8nConfig ? "Encontrada" : "Não encontrada");
                   
-                  setDifyConfigured(false);
                   setN8nConfigured(!!n8nConfig);
                   
                   // Redirect to status if already configured
@@ -133,13 +129,12 @@ const Index = () => {
             console.log("Detalhes completos da instância:", instanceDetails);
           }
           
-          // Verificar apenas n8n e deixar dify como false
+          // Verificar apenas n8n
           try {
             const n8nConfig = getN8nConfig(baseInstanceName);
             
             console.log("n8n config:", n8nConfig ? "Encontrada" : "Não encontrada");
             
-            setDifyConfigured(false);
             setN8nConfigured(!!n8nConfig);
             
             // Redirect to status if already configured
@@ -194,10 +189,9 @@ const Index = () => {
           setInstanceName(baseInstanceName);
           console.log("Instância conectada pelo localStorage:", baseInstanceName);
           
-          // Verificar apenas n8n e deixar dify como false
+          // Verificar apenas n8n
           const n8nConfig = getN8nConfig(baseInstanceName);
           
-          setDifyConfigured(false);
           setN8nConfigured(!!n8nConfig);
           
           // Ir para aba de integração se tiver instância mas não tiver configurações

@@ -68,42 +68,181 @@ export const createN8nFlow = async (userData: {
 }): Promise<{ success: boolean; webhookUrl?: string }> => {
   try {
     console.log("Creating n8n flow for instance:", userData.instanceName);
-    const n8nApiUrl = "https://n8n.whatsvenda.com/api/v1/workflows";
-    const n8nApiKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI5YTViZTBlMC0wMWRjLTQ0ZGMtYTQxNy1kMzQ2ZTYzYjc1N2MiLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwiaWF0IjoxNzQ3NzI3NDE0fQ.9Q-wwkTsMcUjHylJTZ5ibpMZNkkOWV21CJ3m4KR114A";
+    const n8nApiUrl = "https://n8.solucoesweb.uk/api/v1/workflows";
+    const n8nApiKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI5YTViZTBlMC0wMWRjLTQ0ZGMtYTQxNy1kMzQ2ZTYzYjc1N2MiLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwiaWF0IjoxNzQ3ODcxNTk1fQ.hLumuzqAqJUU6dZxAcEAezQVHU1w504bhB5zWMqlZIU";
     
     // Sanitize instance name for path (remove special characters and convert to lowercase)
     const sanitizedPath = userData.instanceName.toLowerCase().replace(/[^a-z0-9]/g, '-');
+    const userId = userData.instanceName.replace(/[^a-z0-9]/g, '');
     
-    // Criando um fluxo simples com um webhook de entrada e um nó de IA
+    // Updated flow with your enhanced model
     const newWorkflow = {
-      name: `WhatsVenda_Integration_${userData.instanceName}`,
+      name: `WhatsVenda_${userData.instanceName}`,
       active: true,
       nodes: [
         {
           parameters: {
-            httpMethod: "POST",
-            path: sanitizedPath,
-            options: {},
-            responseMode: "lastNode",
-            responseData: "firstEntryJson"
+            path: `webhook/whatsapp/${userId}`,
+            options: {
+              responseMode: "lastNode"
+            }
           },
-          name: "Webhook",
+          name: "Receber Mensagem WhatsApp",
           type: "n8n-nodes-base.webhook",
           typeVersion: 1,
-          position: [250, 300]
+          position: [100, 300]
         },
         {
           parameters: {
-            modelType: "default",
-            options: {},
-            prompt: {
-              value: "Você é um assistente de IA para WhatsVenda, instanceName: {{$node[\"Webhook\"].json[\"instanceName\"]}}, message: {{$node[\"Webhook\"].json[\"message\"]}}, sender: {{$node[\"Webhook\"].json[\"sender\"]}}"
+            functionCode: `const message = $input.all()[0].json;
+return [{
+  json: {
+    userId: "${userId}",
+    sender: message.sender || "",
+    messageText: message.message || "",
+    timestamp: new Date().toISOString()
+  }
+}];`
+          },
+          name: "Extrair Dados da Mensagem",
+          type: "n8n-nodes-base.function",
+          typeVersion: 1,
+          position: [300, 300]
+        },
+        {
+          parameters: {
+            url: "https://api.groq.com/openai/v1/chat/completions",
+            method: "POST",
+            headers: {
+              parameters: [
+                {
+                  name: "Authorization",
+                  value: "Bearer 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"
+                },
+                {
+                  name: "Content-Type",
+                  value: "application/json"
+                }
+              ]
+            },
+            sendBody: true,
+            contentType: "json",
+            bodyParameters: {
+              parameters: [
+                {
+                  name: "model",
+                  value: "mixtral-8x7b-32768"
+                },
+                {
+                  name: "messages",
+                  value: `=[
+                    {
+                      "role": "system",
+                      "content": "Você é um assistente do WhatsVenda para ${userData.instanceName}. Seja educado e profissional em suas respostas."
+                    },
+                    {
+                      "role": "user",
+                      "content": "{{$node[\"Extrair Dados da Mensagem\"].json[\"messageText\"]}}"
+                    }
+                  ]`
+                },
+                {
+                  name: "temperature",
+                  value: 0.7
+                }
+              ]
+            },
+            options: {}
+          },
+          name: "Consultar Groq IA",
+          type: "n8n-nodes-base.httpRequest",
+          typeVersion: 3,
+          position: [500, 300]
+        },
+        {
+          parameters: {
+            url: "https://v2.solucoesweb.uk/message/sendText/{{$node[\"Extrair Dados da Mensagem\"].json[\"userId\"]}}_Cliente",
+            method: "POST",
+            headers: {
+              parameters: [
+                {
+                  name: "apikey",
+                  value: "29MoyRfK6RM0CWCOXnReOpAj6dIYTt3z"
+                },
+                {
+                  name: "Content-Type",
+                  value: "application/json"
+                }
+              ]
+            },
+            sendBody: true,
+            contentType: "json",
+            bodyParameters: {
+              parameters: [
+                {
+                  name: "number",
+                  value: "={{$node[\"Extrair Dados da Mensagem\"].json[\"sender\"]}}"
+                },
+                {
+                  name: "options",
+                  value: `={
+                    "delay": 1200,
+                    "presence": "composing"
+                  }`
+                },
+                {
+                  name: "textMessage",
+                  value: `={
+                    "text": "{{$node[\"Consultar Groq IA\"].json[\"choices\"][0][\"message\"][\"content\"]}}"
+                  }`
+                }
+              ]
+            },
+            options: {}
+          },
+          name: "Enviar Resposta WhatsApp",
+          type: "n8n-nodes-base.httpRequest",
+          typeVersion: 3,
+          position: [700, 300]
+        },
+        {
+          parameters: {
+            path: `webhook/knowledge/${userId}`,
+            options: {
+              responseMode: "lastNode"
             }
           },
-          name: "AI Agent",
-          type: "n8n-nodes-base.openAi",
+          name: "Receber Conhecimento",
+          type: "n8n-nodes-base.webhook",
           typeVersion: 1,
-          position: [500, 300]
+          position: [100, 500]
+        },
+        {
+          parameters: {
+            functionCode: `// Processar conhecimento recebido
+const data = $input.all()[0].json;
+let knowledge = "";
+
+if (data.type === "text") {
+  knowledge = data.knowledge || "";
+} else if (data.type === "file") {
+  knowledge = "Arquivo de conhecimento processado: " + (data.filename || "sem nome");
+}
+
+return [{
+  json: {
+    userId: "${userId}",
+    knowledge: knowledge,
+    timestamp: new Date().toISOString(),
+    success: true,
+    message: "Conhecimento registrado com sucesso"
+  }
+}];`
+          },
+          name: "Processar Conhecimento",
+          type: "n8n-nodes-base.function",
+          typeVersion: 1,
+          position: [300, 500]
         },
         {
           parameters: {
@@ -112,35 +251,73 @@ export const createN8nFlow = async (userData: {
               string: [
                 {
                   name: "response",
-                  value: "={{ $json[\"text\"] }}"
+                  value: "={{ $json[\"message\"] }}"
+                }
+              ],
+              boolean: [
+                {
+                  name: "success",
+                  value: true
                 }
               ]
-            },
-            options: {}
+            }
           },
-          name: "Set Response",
+          name: "Preparar Resposta",
           type: "n8n-nodes-base.set",
           typeVersion: 2,
-          position: [700, 300]
+          position: [500, 500]
         }
       ],
       connections: {
-        Webhook: {
+        "Receber Mensagem WhatsApp": {
           main: [
             [
               {
-                node: "AI Agent",
+                node: "Extrair Dados da Mensagem",
                 type: "main",
                 index: 0
               }
             ]
           ]
         },
-        "AI Agent": {
+        "Extrair Dados da Mensagem": {
           main: [
             [
               {
-                node: "Set Response",
+                node: "Consultar Groq IA",
+                type: "main",
+                index: 0
+              }
+            ]
+          ]
+        },
+        "Consultar Groq IA": {
+          main: [
+            [
+              {
+                node: "Enviar Resposta WhatsApp",
+                type: "main",
+                index: 0
+              }
+            ]
+          ]
+        },
+        "Receber Conhecimento": {
+          main: [
+            [
+              {
+                node: "Processar Conhecimento",
+                type: "main",
+                index: 0
+              }
+            ]
+          ]
+        },
+        "Processar Conhecimento": {
+          main: [
+            [
+              {
+                node: "Preparar Resposta",
                 type: "main",
                 index: 0
               }
@@ -170,14 +347,17 @@ export const createN8nFlow = async (userData: {
     console.log("n8n flow created successfully:", data);
     
     // Construir a URL do webhook para o cliente
-    const webhookUrl = `https://n8n.whatsvenda.com/webhook/${sanitizedPath}`;
+    const webhookUrl = `https://n8.solucoesweb.uk/webhook/whatsapp/${userId}`;
     
     // Salvar a configuração inicial do n8n
     saveN8nConfig(userData.instanceName, {
       webhookUrl,
+      n8nUrl: "https://n8.solucoesweb.uk/api/v1",
+      apiKey: n8nApiKey,
       enableWebhook: true,
-      enableApi: false,
-      aiModel: null
+      enableApi: true,
+      aiModel: 'groq',
+      aiApiKey: "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"
     });
 
     return { 
@@ -198,8 +378,8 @@ export const updateN8nFlowAiModel = async (
 ): Promise<boolean> => {
   try {
     // Primeiro, buscar o fluxo existente
-    const n8nApiBaseUrl = "https://n8n.whatsvenda.com/api/v1";
-    const n8nApiKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI5YTViZTBlMC0wMWRjLTQ0ZGMtYTQxNy1kMzQ2ZTYzYjc1N2MiLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwiaWF0IjoxNzQ3NzI3NDE0fQ.9Q-wwkTsMcUjHylJTZ5ibpMZNkkOWV21CJ3m4KR114A";
+    const n8nApiBaseUrl = "https://n8.solucoesweb.uk/api/v1";
+    const n8nApiKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI5YTViZTBlMC0wMWRjLTQ0ZGMtYTQxNy1kMzQ2ZTYzYjc1N2MiLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwiaWF0IjoxNzQ3ODcxNTk1fQ.hLumuzqAqJUU6dZxAcEAezQVHU1w504bhB5zWMqlZIU";
     
     // Buscar todos os workflows para encontrar o correspondente a esta instância
     const response = await fetch(`${n8nApiBaseUrl}/workflows`, {
@@ -215,7 +395,7 @@ export const updateN8nFlowAiModel = async (
     
     const workflows = await response.json();
     const workflow = workflows.data.find((wf: any) => 
-      wf.name === `WhatsVenda_Integration_${instanceName}` || 
+      wf.name === `WhatsVenda_${instanceName}` || 
       wf.name.includes(instanceName)
     );
     
@@ -237,7 +417,11 @@ export const updateN8nFlowAiModel = async (
     
     // Encontrar o nó de IA
     const aiNodeIndex = updatedWorkflow.nodes.findIndex((node: any) => 
-      node.name === "AI Agent" || node.type.includes("openAi") || node.type.includes("Ai")
+      node.name === "Consultar Groq IA" || 
+      node.name.includes("Groq") || 
+      node.name.includes("AI") ||
+      node.name.includes("IA") ||
+      node.type.includes("httpRequest")
     );
     
     if (aiNodeIndex === -1) {
@@ -249,28 +433,11 @@ export const updateN8nFlowAiModel = async (
     if (aiModel === 'openai') {
       updatedWorkflow.nodes[aiNodeIndex] = {
         ...updatedWorkflow.nodes[aiNodeIndex],
-        type: "n8n-nodes-base.openAi",
+        name: "Consultar OpenAI",
         parameters: {
-          ...updatedWorkflow.nodes[aiNodeIndex].parameters,
-          authentication: "apiKey",
-          apiKey: apiKey,
-          modelType: "default",
-          model: "gpt-4o",
-          options: {
-            maxTokens: 1000
-          }
-        }
-      };
-    } else if (aiModel === 'groq') {
-      updatedWorkflow.nodes[aiNodeIndex] = {
-        ...updatedWorkflow.nodes[aiNodeIndex],
-        type: "n8n-nodes-base.httpRequest",
-        parameters: {
-          authentication: "genericCredentialType",
-          url: "https://api.groq.com/openai/v1/chat/completions",
+          url: "https://api.openai.com/v1/chat/completions",
           method: "POST",
-          sendHeaders: true,
-          headerParameters: {
+          headers: {
             parameters: [
               {
                 name: "Authorization",
@@ -288,18 +455,18 @@ export const updateN8nFlowAiModel = async (
             parameters: [
               {
                 name: "model",
-                value: "llama3-70b-8192"
+                value: "gpt-4o"
               },
               {
                 name: "messages",
                 value: `=[
                   {
                     "role": "system",
-                    "content": "Você é um assistente de IA para WhatsVenda"
+                    "content": "Você é um assistente do WhatsVenda para ${instanceName}. Seja educado e profissional em suas respostas."
                   },
                   {
                     "role": "user",
-                    "content": "{{$node[\"Webhook\"].json[\"message\"]}}"
+                    "content": "{{$node[\"Extrair Dados da Mensagem\"].json[\"messageText\"]}}"
                   }
                 ]`
               },
@@ -308,31 +475,57 @@ export const updateN8nFlowAiModel = async (
                 value: 0.7
               }
             ]
-          },
-          options: {}
+          }
         }
       };
-      
-      // Atualizar as conexões do nó para que ele se conecte ao nó Set Response
-      if (updatedWorkflow.connections && updatedWorkflow.connections["AI Agent"]) {
-        // Copiar as conexões do nó AI Agent
-        updatedWorkflow.connections[updatedWorkflow.nodes[aiNodeIndex].name] = 
-          updatedWorkflow.connections["AI Agent"];
-        // Remover as conexões antigas
-        if (updatedWorkflow.nodes[aiNodeIndex].name !== "AI Agent") {
-          delete updatedWorkflow.connections["AI Agent"];
+    } else if (aiModel === 'groq') {
+      updatedWorkflow.nodes[aiNodeIndex] = {
+        ...updatedWorkflow.nodes[aiNodeIndex],
+        name: "Consultar Groq IA",
+        parameters: {
+          url: "https://api.groq.com/openai/v1/chat/completions",
+          method: "POST",
+          headers: {
+            parameters: [
+              {
+                name: "Authorization",
+                value: `Bearer ${apiKey}`
+              },
+              {
+                name: "Content-Type",
+                value: "application/json"
+              }
+            ]
+          },
+          sendBody: true,
+          contentType: "json",
+          bodyParameters: {
+            parameters: [
+              {
+                name: "model",
+                value: "mixtral-8x7b-32768"
+              },
+              {
+                name: "messages",
+                value: `=[
+                  {
+                    "role": "system",
+                    "content": "Você é um assistente do WhatsVenda para ${instanceName}. Seja educado e profissional em suas respostas."
+                  },
+                  {
+                    "role": "user",
+                    "content": "{{$node[\"Extrair Dados da Mensagem\"].json[\"messageText\"]}}"
+                  }
+                ]`
+              },
+              {
+                name: "temperature",
+                value: 0.7
+              }
+            ]
+          }
         }
-      }
-      
-      // Ajustar o nó Set Response para obter a resposta do modelo Groq
-      const setNodeIndex = updatedWorkflow.nodes.findIndex((node: any) => 
-        node.name === "Set Response"
-      );
-      
-      if (setNodeIndex !== -1) {
-        updatedWorkflow.nodes[setNodeIndex].parameters.values.string[0].value = 
-          "={{ $json.body.choices[0].message.content }}";
-      }
+      };
     }
     
     // Enviar o fluxo atualizado
@@ -382,6 +575,10 @@ export const sendKnowledgeToN8nAgent = async (
       return false;
     }
     
+    // Sanitize instance name for path (remove special characters and convert to lowercase)
+    const userId = instanceName.replace(/[^a-z0-9]/g, '');
+    const knowledgeWebhookUrl = `https://n8.solucoesweb.uk/webhook/knowledge/${userId}`;
+    
     const formData = new FormData();
     
     if (type === 'text') {
@@ -395,7 +592,7 @@ export const sendKnowledgeToN8nAgent = async (
     formData.append('instanceName', instanceName);
     formData.append('action', 'add_knowledge');
     
-    const response = await fetch(config.webhookUrl, {
+    const response = await fetch(knowledgeWebhookUrl, {
       method: 'POST',
       body: formData
     });
@@ -410,8 +607,8 @@ export const sendKnowledgeToN8nAgent = async (
 // Função para verificar se o fluxo já existe
 export const checkN8nFlowExists = async (instanceName: string): Promise<boolean> => {
   try {
-    const n8nApiBaseUrl = "https://n8n.whatsvenda.com/api/v1";
-    const n8nApiKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI5YTViZTBlMC0wMWRjLTQ0ZGMtYTQxNy1kMzQ2ZTYzYjc1N2MiLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwiaWF0IjoxNzQ3NzI3NDE0fQ.9Q-wwkTsMcUjHylJTZ5ibpMZNkkOWV21CJ3m4KR114A";
+    const n8nApiBaseUrl = "https://n8.solucoesweb.uk/api/v1";
+    const n8nApiKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI5YTViZTBlMC0wMWRjLTQ0ZGMtYTQxNy1kMzQ2ZTYzYjc1N2MiLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwiaWF0IjoxNzQ3ODcxNTk1fQ.hLumuzqAqJUU6dZxAcEAezQVHU1w504bhB5zWMqlZIU";
     
     const response = await fetch(`${n8nApiBaseUrl}/workflows`, {
       headers: {
@@ -426,7 +623,7 @@ export const checkN8nFlowExists = async (instanceName: string): Promise<boolean>
     
     const workflows = await response.json();
     const workflow = workflows.data.find((wf: any) => 
-      wf.name === `WhatsVenda_Integration_${instanceName}` || 
+      wf.name === `WhatsVenda_${instanceName}` || 
       wf.name.includes(instanceName)
     );
     
