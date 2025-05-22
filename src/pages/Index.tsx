@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -72,31 +73,23 @@ const Index = () => {
                 localStorage.setItem('instanceName', instName);
                 localStorage.setItem('instanceStatus', status || 'Connected');
                 
-                // Pass the instance name to getDifyConfig
+                // Verificar apenas n8n e deixar dify como false
                 try {
-                  const difyConfig = getDifyConfig(baseInstanceName);
+                  // Dify integration is always null or false now
                   const n8nConfig = getN8nConfig(baseInstanceName);
                   
-                  console.log("Configuração Dify:", difyConfig ? "Encontrada" : "Não encontrada");
-                  console.log("Configuração n8n:", n8nConfig ? "Encontrada" : "Não encontrada");
+                  console.log("n8n config:", n8nConfig ? "Encontrada" : "Não encontrada");
                   
-                  setDifyConfigured(!!difyConfig);
+                  setDifyConfigured(false);
                   setN8nConfigured(!!n8nConfig);
                   
                   // Redirect to status if already configured
-                  if (difyConfig || n8nConfig) {
+                  if (n8nConfig) {
                     setActiveTab("status");
-                    
-                    // Show services that are active
-                    let activeServices = [];
-                    if (difyConfig) activeServices.push("Dify IA");
-                    if (n8nConfig) activeServices.push("n8n");
-                    
-                    const servicesMessage = activeServices.join(" e ");
                     
                     toast({
                       title: "Serviços Ativos",
-                      description: `${servicesMessage} configurado${activeServices.length > 1 ? 's' : ''} e ativo${activeServices.length > 1 ? 's' : ''}`,
+                      description: "n8n configurado e ativo",
                     });
                   } else {
                     // Se encontrou instância mas não tem configurações, ir para a aba de bots
@@ -140,31 +133,22 @@ const Index = () => {
             console.log("Detalhes completos da instância:", instanceDetails);
           }
           
-          // Pass the instance name to getDifyConfig
+          // Verificar apenas n8n e deixar dify como false
           try {
-            const difyConfig = getDifyConfig(baseInstanceName);
             const n8nConfig = getN8nConfig(baseInstanceName);
             
-            console.log("Configuração Dify:", difyConfig ? "Encontrada" : "Não encontrada");
-            console.log("Configuração n8n:", n8nConfig ? "Encontrada" : "Não encontrada");
+            console.log("n8n config:", n8nConfig ? "Encontrada" : "Não encontrada");
             
-            setDifyConfigured(!!difyConfig);
+            setDifyConfigured(false);
             setN8nConfigured(!!n8nConfig);
             
             // Redirect to status if already configured
-            if (difyConfig || n8nConfig) {
+            if (n8nConfig) {
               setActiveTab("status");
-              
-              // Show services that are active
-              let activeServices = [];
-              if (difyConfig) activeServices.push("Dify IA");
-              if (n8nConfig) activeServices.push("n8n");
-              
-              const servicesMessage = activeServices.join(" e ");
               
               toast({
                 title: "Serviços Ativos",
-                description: `${servicesMessage} configurado${activeServices.length > 1 ? 's' : ''} e ativo${activeServices.length > 1 ? 's' : ''}`,
+                description: "n8n configurado e ativo",
               });
             } else {
               // Se encontrou instância mas não tem configurações, ir para a aba de bots
@@ -210,15 +194,14 @@ const Index = () => {
           setInstanceName(baseInstanceName);
           console.log("Instância conectada pelo localStorage:", baseInstanceName);
           
-          // Pass the instance name to getDifyConfig
-          const difyConfig = getDifyConfig(baseInstanceName);
+          // Verificar apenas n8n e deixar dify como false
           const n8nConfig = getN8nConfig(baseInstanceName);
           
-          setDifyConfigured(!!difyConfig);
+          setDifyConfigured(false);
           setN8nConfigured(!!n8nConfig);
           
           // Ir para aba de integração se tiver instância mas não tiver configurações
-          if (!difyConfig && !n8nConfig) {
+          if (!n8nConfig) {
             setActiveTab("bots");
           } else {
             setActiveTab("status");

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -243,7 +244,7 @@ const BotIntegration: React.FC<BotIntegrationProps> = ({
         <div>
           <CardTitle className="text-xl text-blue-400">Integração de Bots</CardTitle>
           <CardDescription className="text-gray-400">
-            Integre bots Dify e n8n à instância {instanceName}
+            Integre bots n8n à instância {instanceName}
           </CardDescription>
         </div>
         <Button
@@ -276,9 +277,8 @@ const BotIntegration: React.FC<BotIntegrationProps> = ({
         )}
         
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid grid-cols-6 mb-8">
+          <TabsList className="grid grid-cols-5 mb-8">
             <TabsTrigger value="overview">Visão Geral</TabsTrigger>
-            <TabsTrigger value="dify">Dify IA</TabsTrigger>
             <TabsTrigger value="n8n">n8n</TabsTrigger>
             <TabsTrigger value="typebot">Typebot</TabsTrigger>
             <TabsTrigger value="mercadopago">Mercado Pago</TabsTrigger>
@@ -287,15 +287,6 @@ const BotIntegration: React.FC<BotIntegrationProps> = ({
           
           <TabsContent value="overview">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-              <IntegrationCard 
-                title="Dify IA"
-                description="Plataforma de desenvolvimento de aplicativos de IA conversacional"
-                icon="🧠"
-                color="blue"
-                buttonText="Configurar Dify"
-                buttonAction={() => setActiveTab("dify")}
-              />
-              
               <IntegrationCard 
                 title="n8n"
                 description="Automação de fluxos de trabalho e integração entre serviços"
