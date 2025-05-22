@@ -27,8 +27,8 @@ const BotStatus: React.FC<BotStatusProps> = ({ instanceName }) => {
       // Remover o sufixo "_Cliente" do nome da instância para verificar as configurações
       const baseInstanceName = instanceName.replace("_Cliente", "");
       
-      // Pass the instance name to getDifyConfig
-      const difyConfig = getDifyConfig(baseInstanceName);
+      // The getDifyConfig function no longer expects arguments, so we call it without any
+      const difyConfig = getDifyConfig();
       const n8nConfig = getN8nConfig(baseInstanceName);
       
       setDifyActive(!!difyConfig);
