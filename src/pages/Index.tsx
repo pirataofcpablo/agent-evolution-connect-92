@@ -19,6 +19,14 @@ const Index = () => {
   const [instanceName, setInstanceName] = useState("");
   const [n8nConfigured, setN8nConfigured] = useState(false);
   const [loading, setLoading] = useState(true);
+  
+  // Set a user ID for multi-user environment
+  // In production, this would come from your authentication system
+  useEffect(() => {
+    // This is a simple simulation - in a real app, get this from auth context
+    const userIdFromAuth = localStorage.getItem('userId') || `user_${Math.random().toString(36).substring(2, 9)}`;
+    localStorage.setItem('currentUserId', userIdFromAuth);
+  }, []);
 
   // Set initial tab based on path
   const getInitialTab = () => {
@@ -39,19 +47,32 @@ const Index = () => {
       try {
         console.log("Verificando instâncias conectadas na API Evolution...");
         
+        // Get the current logged in user's ID
+        const currentUserId = localStorage.getItem('currentUserId') || 'default';
+        
         // Verificar diretamente na API Evolution se há instâncias disponíveis
         const instances = await fetchAllInstances();
         console.log(`Encontradas ${instances.length} instâncias na API`);
         
+        // Filter instances by current user ID if applicable
+        // This would require a naming convention or metadata that associates instances with users
+        const userInstancePattern = new RegExp(`(${currentUserId})`);
+        const userInstances = instances.filter(inst => {
+          const name = inst.instanceName || inst.name || '';
+          return userInstancePattern.test(name);
+        });
+        
+        const instancesToCheck = userInstances.length > 0 ? userInstances : instances;
+        
         // Exibir todas instâncias para debug
-        if (Array.isArray(instances) && instances.length > 0) {
-          console.log("Todas instâncias disponíveis:");
-          instances.forEach((inst, idx) => {
+        if (Array.isArray(instancesToCheck) && instancesToCheck.length > 0) {
+          console.log("Instâncias disponíveis para este usuário:");
+          instancesToCheck.forEach((inst, idx) => {
             console.log(`${idx + 1}. Nome: ${inst.instanceName || inst.name || 'N/A'} | Status: ${inst.status || inst.connectionStatus || 'N/A'}`);
           });
           
           // Verificar diretamente se há alguma instância com status "open" ou "connected"
-          for (const inst of instances) {
+          for (const inst of instancesToCheck) {
             const status = inst.status || inst.connectionStatus;
             const isConnected = 
               status === "CONNECTED" || 
@@ -67,9 +88,9 @@ const Index = () => {
                 setInstanceConnected(true);
                 setInstanceName(baseInstanceName);
                 
-                // Atualizar localStorage com dados verificados
-                localStorage.setItem('instanceName', instName);
-                localStorage.setItem('instanceStatus', status || 'Connected');
+                // Atualizar localStorage com dados verificados - user-specific
+                localStorage.setItem(`instanceName_${currentUserId}`, instName);
+                localStorage.setItem(`instanceStatus_${currentUserId}`, status || 'Connected');
                 
                 // Verificar apenas n8n
                 try {
@@ -119,9 +140,9 @@ const Index = () => {
           setInstanceConnected(true);
           setInstanceName(baseInstanceName);
           
-          // Atualizar localStorage com dados verificados
-          localStorage.setItem('instanceName', `${baseInstanceName}_Cliente`);
-          localStorage.setItem('instanceStatus', status || 'Connected');
+          // Atualizar localStorage com dados verificados - user-specific
+          localStorage.setItem(`instanceName_${currentUserId}`, `${baseInstanceName}_Cliente`);
+          localStorage.setItem(`instanceStatus_${currentUserId}`, status || 'Connected');
           
           // Buscar detalhes adicionais da instância
           const instanceDetails = await getInstanceDetails(`${baseInstanceName}_Cliente`);
@@ -177,8 +198,11 @@ const Index = () => {
     // Função de fallback para verificar localStorage
     const checkLocalStorage = () => {
       try {
-        const storedInstanceName = localStorage.getItem('instanceName');
-        const storedInstanceStatus = localStorage.getItem('instanceStatus');
+        // Get the current logged in user's ID
+        const currentUserId = localStorage.getItem('currentUserId') || 'default';
+        
+        const storedInstanceName = localStorage.getItem(`instanceName_${currentUserId}`);
+        const storedInstanceStatus = localStorage.getItem(`instanceStatus_${currentUserId}`);
         
         console.log("Verificando instância no localStorage:", storedInstanceName, storedInstanceStatus);
         

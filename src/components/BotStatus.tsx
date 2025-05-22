@@ -20,10 +20,16 @@ const BotStatus: React.FC<BotStatusProps> = ({ instanceName }) => {
 
   useEffect(() => {
     if (instanceName) {
-      // Remover o sufixo "_Cliente" do nome da instância para verificar as configurações
-      const baseInstanceName = instanceName.replace("_Cliente", "");
+      // Get the current logged in user's ID
+      const currentUserId = localStorage.getItem('currentUserId') || 'default';
       
-      // The getDifyConfig function no longer expects arguments, so we call it without any
+      // Check if we have a user-specific instance name stored
+      const userInstanceName = localStorage.getItem(`instanceName_${currentUserId}`) || instanceName;
+      
+      // Remover o sufixo "_Cliente" do nome da instância para verificar as configurações
+      const baseInstanceName = userInstanceName.replace("_Cliente", "");
+      
+      // The getDifyConfig function no longer expects arguments
       const difyConfig = getDifyConfig();
       const n8nConfig = getN8nConfig(baseInstanceName);
       

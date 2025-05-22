@@ -75,7 +75,7 @@ export const createN8nFlow = async (userData: {
     const sanitizedPath = userData.instanceName.toLowerCase().replace(/[^a-z0-9]/g, '-');
     const userId = userData.instanceName.replace(/[^a-z0-9]/g, '');
     
-    // Updated flow with your enhanced model
+    // Create the workflow with the provided model
     const newWorkflow = {
       name: `WhatsVenda_${userData.instanceName}`,
       active: true,
@@ -83,9 +83,7 @@ export const createN8nFlow = async (userData: {
         {
           parameters: {
             path: `webhook/whatsapp/${userId}`,
-            options: {
-              responseMode: "lastNode"
-            }
+            options: {}
           },
           name: "Receber Mensagem WhatsApp",
           type: "n8n-nodes-base.webhook",
@@ -100,6 +98,8 @@ return [{
     userId: "${userId}",
     sender: message.sender || "",
     messageText: message.message || "",
+    mediaUrl: message.mediaUrl || null,
+    mediaType: message.mediaType || null,
     timestamp: new Date().toISOString()
   }
 }];`
@@ -108,6 +108,28 @@ return [{
           type: "n8n-nodes-base.function",
           typeVersion: 1,
           position: [300, 300]
+        },
+        {
+          parameters: {
+            functionCode: `// Simular busca de conhecimento
+const userId = $input.all()[0].json.userId;
+const messageText = $input.all()[0].json.messageText;
+
+// Aqui você poderia buscar o conhecimento de um banco de dados
+const knowledge = "Você é um assistente de WhatsApp para " + "${userData.instanceName}. " +
+                 "Seja educado e profissional em suas respostas.";
+
+return [{
+  json: {
+    ...$input.all()[0].json,
+    knowledge: knowledge
+  }
+}];`
+          },
+          name: "Buscar Conhecimento do Usuário",
+          type: "n8n-nodes-base.function",
+          typeVersion: 1,
+          position: [500, 300]
         },
         {
           parameters: {
@@ -138,7 +160,7 @@ return [{
                   value: `=[
                     {
                       "role": "system",
-                      "content": "Você é um assistente do WhatsVenda para ${userData.instanceName}. Seja educado e profissional em suas respostas."
+                      "content": "{{$node[\"Buscar Conhecimento do Usuário\"].json[\"knowledge\"]}}"
                     },
                     {
                       "role": "user",
@@ -157,11 +179,11 @@ return [{
           name: "Consultar Groq IA",
           type: "n8n-nodes-base.httpRequest",
           typeVersion: 3,
-          position: [500, 300]
+          position: [700, 300]
         },
         {
           parameters: {
-            url: "https://v2.solucoesweb.uk/message/sendText/{{$node[\"Extrair Dados da Mensagem\"].json[\"userId\"]}}_Cliente",
+            url: `https://v2.solucoesweb.uk/message/sendText/${userData.instanceName}_Cliente`,
             method: "POST",
             headers: {
               parameters: [
@@ -203,7 +225,7 @@ return [{
           name: "Enviar Resposta WhatsApp",
           type: "n8n-nodes-base.httpRequest",
           typeVersion: 3,
-          position: [700, 300]
+          position: [900, 300]
         },
         {
           parameters: {
@@ -215,7 +237,7 @@ return [{
           name: "Receber Conhecimento",
           type: "n8n-nodes-base.webhook",
           typeVersion: 1,
-          position: [100, 500]
+          position: [100, 600]
         },
         {
           parameters: {
@@ -242,7 +264,7 @@ return [{
           name: "Processar Conhecimento",
           type: "n8n-nodes-base.function",
           typeVersion: 1,
-          position: [300, 500]
+          position: [300, 600]
         },
         {
           parameters: {
@@ -265,7 +287,7 @@ return [{
           name: "Preparar Resposta",
           type: "n8n-nodes-base.set",
           typeVersion: 2,
-          position: [500, 500]
+          position: [500, 600]
         }
       ],
       connections: {
@@ -281,6 +303,17 @@ return [{
           ]
         },
         "Extrair Dados da Mensagem": {
+          main: [
+            [
+              {
+                node: "Buscar Conhecimento do Usuário",
+                type: "main",
+                index: 0
+              }
+            ]
+          ]
+        },
+        "Buscar Conhecimento do Usuário": {
           main: [
             [
               {

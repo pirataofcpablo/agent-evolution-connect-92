@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -48,6 +47,10 @@ const BotIntegration: React.FC<BotIntegrationProps> = ({
     try {
       console.log("Verificando conexão da instância diretamente na API Evolution...");
       
+      // Get the current logged in user's ID
+      // This is a placeholder - in a real app, you'd get this from auth context
+      const currentUserId = localStorage.getItem('currentUserId') || 'default';
+      
       // 1. Primeiro, tentar obter direto da API
       const { instanceName: connectedName, status } = await verifyConnectedInstance();
       
@@ -57,15 +60,16 @@ const BotIntegration: React.FC<BotIntegrationProps> = ({
         // Obter detalhes completos da instância
         const instanceWithSuffix = `${connectedName}_Cliente`;
         const details = await getInstanceDetails(instanceWithSuffix);
-        setInstanceDetails(details);
         
+        // Store with user-specific key
+        setInstanceDetails(details);
         setInstanceName(connectedName);
         setInstanceConnected(true);
         setInstanceError(null);
         
-        // Atualizar localStorage com a instância verificada
-        localStorage.setItem('instanceName', instanceWithSuffix);
-        localStorage.setItem('instanceStatus', status || 'Connected');
+        // Atualizar localStorage com a instância verificada e user-specific key
+        localStorage.setItem(`instanceName_${currentUserId}`, instanceWithSuffix);
+        localStorage.setItem(`instanceStatus_${currentUserId}`, status || 'Connected');
         
         toast({
           title: "Instância verificada",
@@ -82,8 +86,18 @@ const BotIntegration: React.FC<BotIntegrationProps> = ({
       if (Array.isArray(allInstances) && allInstances.length > 0) {
         console.log(`Encontradas ${allInstances.length} instâncias. Verificando status...`);
         
-        // Procurar qualquer instância conectada
-        for (const inst of allInstances) {
+        // Only consider instances that match the current user's instances
+        // Filter by stored instance name or a naming pattern that includes the user ID
+        const userInstancePattern = new RegExp(`(${currentUserId}|${initialInstanceName})`);
+        const userInstances = allInstances.filter(inst => 
+          (inst.instanceName && userInstancePattern.test(inst.instanceName)) || 
+          (inst.name && userInstancePattern.test(inst.name))
+        );
+        
+        console.log(`Encontradas ${userInstances.length} instâncias para o usuário atual`);
+        
+        // Procurar qualquer instância conectada entre as do usuário
+        for (const inst of userInstances) {
           const name = inst.instanceName || inst.name;
           const instStatus = inst.status || inst.connectionStatus;
           
@@ -104,8 +118,8 @@ const BotIntegration: React.FC<BotIntegrationProps> = ({
             setInstanceConnected(true);
             setInstanceError(null);
             
-            localStorage.setItem('instanceName', name);
-            localStorage.setItem('instanceStatus', instStatus);
+            localStorage.setItem(`instanceName_${currentUserId}`, name);
+            localStorage.setItem(`instanceStatus_${currentUserId}`, instStatus);
             
             toast({
               title: "Instância encontrada",
@@ -173,7 +187,20 @@ const BotIntegration: React.FC<BotIntegrationProps> = ({
   
   // Verificar o status da instância quando o componente é montado
   useEffect(() => {
-    checkInstanceConnection();
+    // Get the current logged in user's ID
+    const currentUserId = localStorage.getItem('currentUserId') || 'default';
+    
+    // Check if user-specific instance is already stored
+    const storedInstanceName = localStorage.getItem(`instanceName_${currentUserId}`);
+    
+    if (storedInstanceName && storedInstanceName !== initialInstanceName) {
+      // If user has their own instance different from the passed one, use that
+      setInstanceName(storedInstanceName.replace("_Cliente", ""));
+      checkInstanceConnection();
+    } else {
+      // Otherwise check the passed instance
+      checkInstanceConnection();
+    }
   }, [initialInstanceName]);
 
   if (verifyingInstance) {
